@@ -27,6 +27,7 @@ namespace Companion.Presentation.Editor
         private const string Faces = "Assets/Companion/Character/Robert/Faces";
         private const string Manifest = Faces + "/animations.json";
         private const string Generated = "Assets/Companion/Generated";
+        private const string SkinAsset = Generated + "/RobertSkin_default.asset";
         private const string FaceMesh = "FaceScreen";
         private static readonly string[] BodyClips = { "Idle", "Wave", "Nod", "Celebrate" };
 
@@ -230,9 +231,11 @@ namespace Companion.Presentation.Editor
             }
             Material material = new Material(shader) { name = "FaceScreen_Unlit_Generated" };
             material.mainTexture = neutral;
-            string path = Generated + "/FaceScreen_Unlit.mat";
-            AssetDatabase.CreateAsset(material, path);
-            return AssetDatabase.LoadAssetAtPath<Material>(path);
+            AssetDatabase.CreateAsset(material, Generated + "/FaceScreen_Unlit.mat");
+            // CreateAsset makes this instance the asset. Reloading it by path
+            // can return null within the same pass, which would wire a silent
+            // null reference into everything downstream.
+            return material;
         }
 
         private static AnimatorController CreateAnimator(Dictionary<string, AnimationClip> clips)
@@ -404,9 +407,28 @@ namespace Companion.Presentation.Editor
             serialized.FindProperty("defaultFace").objectReferenceValue = neutral;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
-            string path = Generated + "/RobertSkin_default.asset";
-            AssetDatabase.CreateAsset(skin, path);
-            return AssetDatabase.LoadAssetAtPath<RobertSkinDefinition>(path);
+            AssetDatabase.CreateAsset(skin, SkinAsset);
+            // Flush before the scene is replaced: opening a new scene
+            // invalidates references to assets that are still only in memory,
+            // which silently serialises as a null reference.
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return skin;
+        }
+
+        /// <summary>
+        /// A reference that failed to serialise shows up on a device only as a
+        /// generic "wire a valid ..." error, so check it here instead.
+        /// </summary>
+        private static void Require(SerializedObject target, string field)
+        {
+            SerializedProperty property = target.FindProperty(field);
+            if (property == null || property.objectReferenceValue == null)
+            {
+                throw new InvalidOperationException(
+                    "The generated scene left '" + field + "' unassigned on " +
+                    target.targetObject.GetType().Name + ".");
+            }
         }
 
         private static string CreateScene(
@@ -435,8 +457,14 @@ namespace Companion.Presentation.Editor
             RobertSkinController controller = character.AddComponent<RobertSkinController>();
             SerializedObject serializedController = new SerializedObject(controller);
             serializedController.FindProperty("visualRoot").objectReferenceValue = visualRoot.transform;
-            serializedController.FindProperty("defaultSkin").objectReferenceValue = skin;
+            // Re-resolve after the scene switch rather than trusting the
+            // instance created before it.
+            RobertSkinDefinition persisted =
+                AssetDatabase.LoadAssetAtPath<RobertSkinDefinition>(SkinAsset) ?? skin;
+            serializedController.FindProperty("defaultSkin").objectReferenceValue = persisted;
             serializedController.ApplyModifiedPropertiesWithoutUndo();
+            Require(serializedController, "visualRoot");
+            Require(serializedController, "defaultSkin");
 
             GameObject bridge = new GameObject("CompanionBridge");
             RobertAvatarPresentation presentation = bridge.AddComponent<RobertAvatarPresentation>();
@@ -446,11 +474,16 @@ namespace Companion.Presentation.Editor
             serializedPresentation.FindProperty("happyFace").objectReferenceValue = happy;
             serializedPresentation.FindProperty("surprisedFace").objectReferenceValue = surprised;
             serializedPresentation.ApplyModifiedPropertiesWithoutUndo();
+            foreach (string field in new[] { "skinController", "neutralFace", "happyFace", "surprisedFace" })
+            {
+                Require(serializedPresentation, field);
+            }
 
             CompanionBridgeReceiver receiver = bridge.AddComponent<CompanionBridgeReceiver>();
             SerializedObject serializedReceiver = new SerializedObject(receiver);
             serializedReceiver.FindProperty("presentationBehaviour").objectReferenceValue = presentation;
             serializedReceiver.ApplyModifiedPropertiesWithoutUndo();
+            Require(serializedReceiver, "presentationBehaviour");
 
             bridge.AddComponent<AndroidUnityEventTransport>();
 

@@ -188,6 +188,25 @@ Commands are then held until the receiver proves it exists by emitting its first
 event. Delivering earlier targets a GameObject the scene has not created yet,
 and Unity drops that silently, with no error on either side.
 
+### Generated assets must outlive the scene switch
+
+Two wiring traps in the builder, both of which serialise as a plausible-looking
+null rather than an error:
+
+- `AssetDatabase.CreateAsset` makes the instance passed to it *become* the
+  asset, but reloading it by path in the same pass can return null. The builder
+  uses the created instance directly.
+- Opening the generated scene with `EditorSceneManager.NewScene` invalidates
+  references to assets created earlier in the same run. The skin definition is
+  flushed with `SaveAssets`/`Refresh` and then re-resolved by path *after* the
+  scene exists.
+
+Missing either one leaves `defaultSkin: {fileID: 0}` in the scene, and the only
+symptom is `RobertSkinController` logging "wire a valid default skin, visual
+root and face player" on a device. The builder therefore asserts every
+serialized reference it sets with `Require(...)`, so an unassigned field fails
+the export instead.
+
 ### Generated prefabs must be unpacked
 
 The room builder instantiates the imported model and then adds components to
