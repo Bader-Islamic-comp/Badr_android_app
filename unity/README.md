@@ -258,17 +258,24 @@ io.flutter.embedding.android.FlutterView{... 0,0-1080,2400 #1}
   io.flutter.embedding.android.FlutterTextureView{...}
 ```
 
-Two things remain before the room is actually seen and driven:
+The room renders. `design/room-on-device.png` is the character running full
+bleed behind the Flutter layer on that emulator: the Blender model, its rig and
+the neutral face texture, framed from the model's own measured bounds with the
+page's cards and scrims over it.
 
-- **Flutter paints over it.** The scaffold and the character stage draw the
-  opaque ivory and sage palette across the whole screen, so the surface behind
-  them is hidden. Showing the room means giving the stage region a transparent
-  window onto it, which is a visual-design change rather than a wiring fix.
-- **The bridge handshake does not complete.** Flutter still falls back to the
-  static avatar, so `unity.ready` is not reaching it. The receiver, transport
-  and host queueing are all in place and unit-tested; what has not been
-  confirmed is the `AndroidJavaClass` hop from the Unity transport into
-  `CompanionEventBridge` on a device.
+Two things remain:
+
+- **The bridge handshake does not complete.** The status chip still reads
+  "Character room · not connected", so `unity.ready` is not reaching Flutter and
+  no presentation cue can be delivered. The receiver, transport and host
+  queueing are in place and unit-tested; what has not been confirmed on a device
+  is the `AndroidJavaClass` hop from the Unity transport into
+  `CompanionEventBridge`.
+- **A cold first launch can still miss the room.** Immediately after an install
+  the page came up opaque and a warm relaunch showed the room, so the surface
+  probe's 20-second deadline is not always enough on a loaded emulator. A
+  deadline is the wrong instrument for this: the host should push a "room
+  attached" event rather than have Flutter wait on a reply.
 
 ## Open device questions
 
