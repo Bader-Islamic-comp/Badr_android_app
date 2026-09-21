@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "robert",
+  "display_name": "Robert",
+  "default_skin": "default",
+  "path_base": "character_root",
+  "skins": { "default": "skins/default/skin.json" },
+  "rig_contract": "shared/rig_contract.json",
+  "default_face_set": "shared/faces/default/animations.json"
+}

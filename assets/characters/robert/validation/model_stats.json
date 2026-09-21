@@ -1,0 +1,18 @@
+{
+  "triangles": 14066,
+  "vertices": 7268,
+  "bones": 24,
+  "materials": 8,
+  "clips": [
+    "Idle",
+    "Wave",
+    "Nod",
+    "Celebrate"
+  ],
+  "height_m": 2.3086,
+  "revision": 3,
+  "face_mode": "png_texture",
+  "torso_height_scale": 0.88,
+  "leg_height_scale": 0.6,
+  "arm_length_scale": 1.0
+}

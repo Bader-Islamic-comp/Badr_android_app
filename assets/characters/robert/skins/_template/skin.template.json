@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "replace_with_unique_skin_id",
+  "display_name": "New Skin",
+  "path_base": "character_root",
+  "rig_contract": "robert-rig-v1",
+  "model": "skins/replace_with_unique_skin_id/model/Robert.glb",
+  "source": "skins/replace_with_unique_skin_id/source/Robert.blend",
+  "face_set": "shared/faces/default/animations.json",
+  "face_binding": { "mesh": "FaceScreen", "material": "FaceScreen_Unlit", "uv_set": 0, "texture_size": [1024, 512], "opaque": true },
+  "body_clips": ["Idle", "Wave", "Nod", "Celebrate"]
+}

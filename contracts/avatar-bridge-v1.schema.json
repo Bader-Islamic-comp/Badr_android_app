@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Companion presentation bridge v1",
+  "description": "Presentation-only bounded JSON messages. Command UTF-8/character cap enforced separately; no free-text, credentials or profile data. Sequence/replay and installed-capability checks are stateful and enforced by receivers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "messageId",
+    "type",
+    "sequence",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "messageId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "avatar.initialize",
+        "avatar.play",
+        "avatar.set_emotion",
+        "avatar.set_cosmetics",
+        "app.pause",
+        "app.resume",
+        "unity.ready",
+        "bridge.ack",
+        "asset.failed"
+      ]
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "avatar.initialize"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "characterId",
+              "capabilities"
+            ],
+            "properties": {
+              "characterId": {
+                "const": "robert"
+              },
+              "capabilities": {
+                "type": "array",
+                "uniqueItems": true,
+                "maxItems": 5,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "avatar.play",
+                    "avatar.set_emotion",
+                    "avatar.set_cosmetics",
+                    "app.pause",
+                    "app.resume"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "avatar.play"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "animation"
+            ],
+            "properties": {
+              "animation": {
+                "type": "string",
+                "enum": [
+                  "Idle",
+                  "Wave",
+                  "Nod",
+                  "Celebrate"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "avatar.set_emotion"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "emotion"
+            ],
+            "properties": {
+              "emotion": {
+                "type": "string",
+                "enum": [
+                  "neutral",
+                  "happy",
+                  "surprised"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "avatar.set_cosmetics"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cosmeticId"
+            ],
+            "properties": {
+              "cosmeticId": {
+                "const": "default"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "app.pause"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "app.resume"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "unity.ready"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "characterId",
+              "capabilities"
+            ],
+            "properties": {
+              "characterId": {
+                "const": "robert"
+              },
+              "capabilities": {
+                "type": "array",
+                "uniqueItems": true,
+                "maxItems": 5,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "avatar.play",
+                    "avatar.set_emotion",
+                    "avatar.set_cosmetics",
+                    "app.pause",
+                    "app.resume"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "bridge.ack"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ackMessageId",
+              "accepted",
+              "reason"
+            ],
+            "properties": {
+              "ackMessageId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              },
+              "accepted": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "invalid_envelope",
+                  "message_id_conflict",
+                  "stale_sequence",
+                  "asset_unavailable",
+                  "already_initialized",
+                  "not_initialized",
+                  "unsupported_capability",
+                  "presentation_rejected"
+                ]
+              }
+            },
+            "if": { "properties": { "accepted": { "const": true } } },
+            "then": { "properties": { "reason": { "const": "ok" } } },
+            "else": { "properties": { "reason": { "not": { "const": "ok" } } } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "asset.failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "const": "asset_unavailable"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

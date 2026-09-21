@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "default",
+  "display_name": "Robert Original",
+  "path_base": "character_root",
+  "rig_contract": "robert-rig-v1",
+  "model": "skins/default/model/Robert.glb",
+  "source": "skins/default/source/Robert.blend",
+  "preview": "previews/Robert_preview.png",
+  "face_set": "shared/faces/default/animations.json",
+  "face_binding": { "mesh": "FaceScreen", "material": "FaceScreen_Unlit", "uv_set": 0, "texture_size": [1024, 512], "opaque": true },
+  "body_clips": ["Idle", "Wave", "Nod", "Celebrate"]
+}

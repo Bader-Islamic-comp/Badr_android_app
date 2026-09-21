@@ -1,0 +1,35 @@
+{
+    "name": "Robert Learning Companion — Development Preview",
+    "short_name": "Little Steps",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#FAF7EF",
+    "theme_color": "#236C67",
+    "description": "Adult-operated synthetic development preview with Robert.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

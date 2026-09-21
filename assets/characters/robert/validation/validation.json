@@ -1,0 +1,26 @@
+{
+  "glb_header_valid": true,
+  "roundtrip_import": true,
+  "mesh_objects": 2,
+  "all_vertices_weighted": true,
+  "finite_coordinates": true,
+  "animation_names": [
+    "Idle",
+    "Wave",
+    "Nod",
+    "Celebrate"
+  ],
+  "joint_count": 24,
+  "size_bytes": 1092744,
+  "engine_device_tested": false,
+  "face_mode": "png_texture",
+  "uv_full_range": true,
+  "no_facial_morphs": true,
+  "embedded_png": true,
+  "flat_torso_battery_cover": true,
+  "original_head_back_restored": true,
+  "flat_soles_verified": true,
+  "png_swap_rendered": true,
+  "catalogue_paths_valid": true,
+  "face_sequences_valid": true
+}

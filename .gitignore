@@ -1,0 +1,20 @@
+.dart_tool/
+.flutter-plugins*
+build/
+coverage/
+.idea/
+*.iml
+android/local.properties
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+.env
+.env.*
+!.env.example
+*.local.json
+
+# Large binaries kept on disk for reference but not tracked. `archive/` holds
+# superseded character revisions and the packaged distributable, both of which
+# are reproducible from assets/characters/robert/tools/. `design/ui.make` is the
+# 6 MB Figma source; design/ui-reference.png is the tracked layout reference.
+archive/
+design/ui.make

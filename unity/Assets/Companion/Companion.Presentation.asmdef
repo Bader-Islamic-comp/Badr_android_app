@@ -1,0 +1,11 @@
+{
+  "name": "Companion.Presentation",
+  "rootNamespace": "Companion.Presentation",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "autoReferenced": true,
+  "noEngineReferences": false
+}
