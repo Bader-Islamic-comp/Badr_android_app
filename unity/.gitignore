@@ -1,0 +1,17 @@
+# Unity-generated. The project is reproducible from Assets/, Packages/ and
+# ProjectSettings/; everything below is a local build cache or user state.
+Library/
+Temp/
+Logs/
+Obj/
+obj/
+Build/
+Builds/
+UserSettings/
+MemoryCaptures/
+Recordings/
+*.csproj
+*.sln
+*.user
+# The exported Android project is a build output, not source.
+export/

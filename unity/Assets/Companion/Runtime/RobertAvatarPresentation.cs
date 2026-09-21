@@ -16,7 +16,6 @@ namespace Companion.Presentation
     public sealed class RobertAvatarPresentation : MonoBehaviour, IAvatarPresentation
     {
         [SerializeField] private RobertSkinController skinController;
-        [SerializeField] private Animator animator;
         [SerializeField] private Texture2D neutralFace;
         [SerializeField] private Texture2D happyFace;
         [SerializeField] private Texture2D surprisedFace;
@@ -29,6 +28,8 @@ namespace Companion.Presentation
         };
 
         private readonly Dictionary<string, Texture2D> faces = new Dictionary<string, Texture2D>();
+        private Animator animator;
+        private RobertSkinDefinition boundSkin;
         private bool paused;
 
         private void Awake()
@@ -36,6 +37,23 @@ namespace Companion.Presentation
             faces["neutral"] = neutralFace;
             faces["happy"] = happyFace;
             faces["surprised"] = surprisedFace;
+        }
+
+        /// <summary>
+        /// The Animator belongs to the model prefab, which the skin controller
+        /// instantiates at runtime, so it cannot be wired in the scene. Resolve
+        /// it from whatever visual is currently installed and re-resolve after a
+        /// skin swap, which replaces that object entirely.
+        /// </summary>
+        private Animator ResolveAnimator()
+        {
+            if (skinController == null) return null;
+            if (animator != null && boundSkin == skinController.CurrentSkin) return animator;
+            RobertFacePlayer player = skinController.FacePlayer;
+            if (player == null) return null;
+            animator = player.GetComponentInParent<Animator>();
+            boundSkin = skinController.CurrentSkin;
+            return animator;
         }
 
         /// <summary>
@@ -47,9 +65,9 @@ namespace Companion.Presentation
         {
             get
             {
-                return skinController != null && skinController.FacePlayer != null &&
-                       animator != null && animator.runtimeAnimatorController != null &&
-                       neutralFace != null;
+                Animator current = ResolveAnimator();
+                return current != null && current.runtimeAnimatorController != null &&
+                       skinController.FacePlayer != null && neutralFace != null;
             }
         }
 
@@ -57,15 +75,17 @@ namespace Companion.Presentation
 
         public bool Apply(BridgeCommand command)
         {
+            Animator current = ResolveAnimator();
+            if (current == null) return false;
             switch (command.Type)
             {
                 case BridgeCommand.Initialize:
                     paused = false;
-                    animator.speed = 1f;
-                    return SetFace("neutral") && Play("Idle");
+                    current.speed = 1f;
+                    return SetFace("neutral") && Play(current, "Idle");
                 case "avatar.play":
                     // A cue arriving while paused is declined, not an error.
-                    return !paused && Play(command.Animation);
+                    return !paused && Play(current, command.Animation);
                 case "avatar.set_emotion":
                     return !paused && SetFace(command.Emotion);
                 case "avatar.set_cosmetics":
@@ -75,22 +95,23 @@ namespace Companion.Presentation
                     return command.CosmeticId == "default" && skinController.CurrentSkin != null;
                 case "app.pause":
                     paused = true;
-                    animator.speed = 0f;
+                    current.speed = 0f;
                     skinController.FacePlayer.StopPlayback();
                     return true;
                 case "app.resume":
                     paused = false;
-                    animator.speed = 1f;
+                    current.speed = 1f;
                     return SetFace("neutral");
                 default:
                     return false;
             }
         }
 
-        private bool Play(string clip)
+        private static bool Play(Animator target, string clip)
         {
             if (string.IsNullOrEmpty(clip)) return false;
-            animator.Play(clip, 0, 0f);
+            if (!target.HasState(0, Animator.StringToHash(clip))) return false;
+            target.Play(clip, 0, 0f);
             return true;
         }
 

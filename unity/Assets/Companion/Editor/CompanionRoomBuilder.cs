@@ -1,0 +1,335 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using RobertCharacter;
+using UnityEditor;
+using UnityEditor.Animations;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace Companion.Presentation.Editor
+{
+    /// <summary>
+    /// Builds the development character room from the staged canonical assets.
+    ///
+    /// Everything it creates lands under Assets/Companion/Generated so the
+    /// canonical package stays authoritative and a rebuild never edits a
+    /// hand-made file. It validates the model, rig and face manifest before
+    /// touching anything, and refuses rather than fabricating a substitute.
+    /// </summary>
+    public static class CompanionRoomBuilder
+    {
+        private const string Model = "Assets/Companion/Character/Robert/Robert.glb";
+        private const string Faces = "Assets/Companion/Character/Robert/Faces";
+        private const string Manifest = Faces + "/animations.json";
+        private const string Generated = "Assets/Companion/Generated";
+        private const string FaceMesh = "FaceScreen";
+        private static readonly string[] BodyClips = { "Idle", "Wave", "Nod", "Celebrate" };
+
+        [MenuItem("Companion/Create Robert Development Room")]
+        public static void BuildRoom()
+        {
+            string scenePath = Build();
+            Debug.Log("Companion: created the development room at " + scenePath);
+        }
+
+        /// <summary>Batch entry point: fails the Editor run on any problem.</summary>
+        public static void BuildRoomBatch()
+        {
+            try
+            {
+                string scenePath = Build();
+                Console.WriteLine("ROOM_OK " + scenePath);
+                EditorApplication.Exit(0);
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("ROOM_FAILED " + error.Message);
+                EditorApplication.Exit(2);
+            }
+        }
+
+        private static string Build()
+        {
+            GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(Model);
+            if (model == null)
+            {
+                throw new InvalidOperationException(
+                    "No imported model at " + Model +
+                    ". Install a glTF importer that produces a GameObject asset.");
+            }
+
+            Dictionary<string, AnimationClip> clips = LoadBodyClips();
+            Texture2D neutral = LoadFace("neutral");
+            Texture2D happy = LoadFace("happy");
+            Texture2D surprised = LoadFace("surprised");
+
+            Directory.CreateDirectory(Generated);
+            AssetDatabase.Refresh();
+
+            Material faceMaterial = CreateFaceMaterial(neutral);
+            AnimatorController controller = CreateAnimator(clips);
+            GameObject prefab = CreatePrefab(model, faceMaterial, controller, neutral);
+            RobertSkinDefinition skin = CreateSkinDefinition(prefab, neutral);
+            string scenePath = CreateScene(skin, neutral, happy, surprised);
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            return scenePath;
+        }
+
+        private static Dictionary<string, AnimationClip> LoadBodyClips()
+        {
+            var found = new Dictionary<string, AnimationClip>(StringComparer.OrdinalIgnoreCase);
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(Model))
+            {
+                AnimationClip clip = asset as AnimationClip;
+                if (clip != null && !found.ContainsKey(clip.name)) found[clip.name] = clip;
+            }
+            var missing = BodyClips.Where(name => !found.ContainsKey(name)).ToArray();
+            if (missing.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    "The imported model is missing required clips: " + string.Join(", ", missing) +
+                    ". Found: " + string.Join(", ", found.Keys.ToArray()));
+            }
+            return found;
+        }
+
+        private static Texture2D LoadFace(string name)
+        {
+            string path = Faces + "/" + name + ".png";
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (texture == null) throw new InvalidOperationException("Missing face texture " + path);
+            return texture;
+        }
+
+        private static Material CreateFaceMaterial(Texture2D neutral)
+        {
+            // The face is an opaque unlit screen; the render pipeline decides
+            // which unlit shader exists, and an unknown pipeline is refused
+            // rather than silently rendered with a lit shader.
+            Shader shader = Shader.Find("Unlit/Texture") ?? Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+            {
+                throw new InvalidOperationException(
+                    "No unlit shader found. Add an explicit material adapter for this render pipeline.");
+            }
+            Material material = new Material(shader) { name = "FaceScreen_Unlit_Generated" };
+            material.mainTexture = neutral;
+            string path = Generated + "/FaceScreen_Unlit.mat";
+            AssetDatabase.CreateAsset(material, path);
+            return AssetDatabase.LoadAssetAtPath<Material>(path);
+        }
+
+        private static AnimatorController CreateAnimator(Dictionary<string, AnimationClip> clips)
+        {
+            string path = Generated + "/RobertBody.controller";
+            AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(path);
+            AnimatorStateMachine machine = controller.layers[0].stateMachine;
+
+            AnimatorState idle = machine.AddState("Idle");
+            idle.motion = clips["Idle"];
+            machine.defaultState = idle;
+
+            // One-shot reactions return to Idle on their own, which is what lets
+            // bridge v1 stay free of an `animation.completed` event.
+            foreach (string name in BodyClips.Where(c => c != "Idle"))
+            {
+                AnimatorState state = machine.AddState(name);
+                state.motion = clips[name];
+                AnimatorStateTransition transition = state.AddTransition(idle);
+                transition.hasExitTime = true;
+                transition.exitTime = 1f;
+                transition.duration = 0.12f;
+            }
+            EditorUtility.SetDirty(controller);
+            return controller;
+        }
+
+        private static GameObject CreatePrefab(
+            GameObject model, Material faceMaterial, AnimatorController controller, Texture2D neutral)
+        {
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
+            try
+            {
+                Renderer faceRenderer = FindFaceRenderer(instance);
+                Material[] materials = faceRenderer.sharedMaterials;
+                materials[0] = faceMaterial;
+                faceRenderer.sharedMaterials = materials;
+
+                Animator animator = instance.GetComponent<Animator>() ?? instance.AddComponent<Animator>();
+                animator.runtimeAnimatorController = controller;
+                animator.applyRootMotion = false;
+
+                RobertFacePlayer player = instance.AddComponent<RobertFacePlayer>();
+                ConfigureFacePlayer(player, faceRenderer, neutral);
+
+                string path = Generated + "/RobertSkin_default.prefab";
+                GameObject saved = PrefabUtility.SaveAsPrefabAsset(instance, path);
+                if (saved == null) throw new InvalidOperationException("Could not save the model prefab.");
+                return saved;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(instance);
+            }
+        }
+
+        private static Renderer FindFaceRenderer(GameObject instance)
+        {
+            foreach (Renderer renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer.gameObject.name != FaceMesh) continue;
+                if (renderer.sharedMaterials.Length == 0 || renderer.sharedMaterials[0] == null) continue;
+                return renderer;
+            }
+            throw new InvalidOperationException(
+                "The imported model has no '" + FaceMesh + "' renderer with a material in slot 0.");
+        }
+
+        // The approved manifest owns the timings; convert its milliseconds to the
+        // seconds the player expects rather than restating them here.
+        private static void ConfigureFacePlayer(
+            RobertFacePlayer player, Renderer faceRenderer, Texture2D neutral)
+        {
+            SerializedObject serialized = new SerializedObject(player);
+            serialized.FindProperty("faceRenderer").objectReferenceValue = faceRenderer;
+            serialized.FindProperty("defaultFace").objectReferenceValue = neutral;
+            serialized.FindProperty("useUnscaledTime").boolValue = true;
+
+            List<FaceClip> clips = ReadFaceClips();
+            SerializedProperty array = serialized.FindProperty("clips");
+            array.arraySize = clips.Count;
+            for (int i = 0; i < clips.Count; i++)
+            {
+                FaceClip clip = clips[i];
+                SerializedProperty element = array.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("name").stringValue = clip.Name;
+                element.FindPropertyRelative("loop").boolValue = clip.Loop;
+                element.FindPropertyRelative("framesPerSecond").floatValue = 12f;
+
+                SerializedProperty frames = element.FindPropertyRelative("frames");
+                SerializedProperty durations = element.FindPropertyRelative("frameDurations");
+                frames.arraySize = clip.Frames.Count;
+                durations.arraySize = clip.Frames.Count;
+                for (int f = 0; f < clip.Frames.Count; f++)
+                {
+                    frames.GetArrayElementAtIndex(f).objectReferenceValue = LoadFace(clip.Frames[f]);
+                    durations.GetArrayElementAtIndex(f).floatValue = clip.Durations[f];
+                }
+            }
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private sealed class FaceClip
+        {
+            public string Name;
+            public bool Loop;
+            public readonly List<string> Frames = new List<string>();
+            public readonly List<float> Durations = new List<float>();
+        }
+
+        private static List<FaceClip> ReadFaceClips()
+        {
+            TextAsset text = AssetDatabase.LoadAssetAtPath<TextAsset>(Manifest);
+            if (text == null) throw new InvalidOperationException("Missing face manifest " + Manifest);
+            JsonValue root = Json.Parse(text.text);
+            if (root == null || root.Kind != JsonKind.Object || !root.Members.ContainsKey("clips"))
+            {
+                throw new InvalidOperationException("The face manifest is not valid JSON with a 'clips' object.");
+            }
+            JsonValue clips = root.Members["clips"];
+            var result = new List<FaceClip>();
+            foreach (KeyValuePair<string, JsonValue> entry in clips.Members)
+            {
+                JsonValue body = entry.Value;
+                if (body.Kind != JsonKind.Object || !body.Members.ContainsKey("frames")) continue;
+                FaceClip clip = new FaceClip { Name = entry.Key };
+                JsonValue loop;
+                clip.Loop = body.Members.TryGetValue("loop", out loop) && loop.Boolean;
+                foreach (JsonValue frame in body.Members["frames"].Items)
+                {
+                    string png = frame.Members["png"].Text;
+                    long milliseconds;
+                    if (!frame.Members["duration_ms"].TryInteger(out milliseconds)) continue;
+                    clip.Frames.Add(Path.GetFileNameWithoutExtension(png));
+                    clip.Durations.Add(milliseconds / 1000f);
+                }
+                if (clip.Frames.Count > 0) result.Add(clip);
+            }
+            if (result.Count == 0) throw new InvalidOperationException("The face manifest declares no usable clips.");
+            return result;
+        }
+
+        private static RobertSkinDefinition CreateSkinDefinition(GameObject prefab, Texture2D neutral)
+        {
+            RobertSkinDefinition skin = ScriptableObject.CreateInstance<RobertSkinDefinition>();
+            SerializedObject serialized = new SerializedObject(skin);
+            serialized.FindProperty("stableId").stringValue = "default";
+            serialized.FindProperty("modelPrefab").objectReferenceValue = prefab;
+            serialized.FindProperty("defaultFace").objectReferenceValue = neutral;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            string path = Generated + "/RobertSkin_default.asset";
+            AssetDatabase.CreateAsset(skin, path);
+            return AssetDatabase.LoadAssetAtPath<RobertSkinDefinition>(path);
+        }
+
+        private static string CreateScene(
+            RobertSkinDefinition skin, Texture2D neutral, Texture2D happy, Texture2D surprised)
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            GameObject cameraObject = new GameObject("Room Camera");
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            // Transparent so the Flutter surface above it remains visible; the
+            // composition itself still has to be proven on a device.
+            camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+            camera.transform.position = new Vector3(0f, 1.1f, 2.4f);
+            camera.transform.rotation = Quaternion.Euler(6f, 180f, 0f);
+
+            GameObject lightObject = new GameObject("Key Light");
+            Light light = lightObject.AddComponent<Light>();
+            light.type = LightType.Directional;
+            light.intensity = 1.1f;
+            lightObject.transform.rotation = Quaternion.Euler(45f, 160f, 0f);
+
+            GameObject character = new GameObject("Robert");
+            GameObject visualRoot = new GameObject("Visual Root");
+            visualRoot.transform.SetParent(character.transform, false);
+            RobertSkinController controller = character.AddComponent<RobertSkinController>();
+            SerializedObject serializedController = new SerializedObject(controller);
+            serializedController.FindProperty("visualRoot").objectReferenceValue = visualRoot.transform;
+            serializedController.FindProperty("defaultSkin").objectReferenceValue = skin;
+            serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+            GameObject bridge = new GameObject("CompanionBridge");
+            RobertAvatarPresentation presentation = bridge.AddComponent<RobertAvatarPresentation>();
+            SerializedObject serializedPresentation = new SerializedObject(presentation);
+            serializedPresentation.FindProperty("skinController").objectReferenceValue = controller;
+            serializedPresentation.FindProperty("neutralFace").objectReferenceValue = neutral;
+            serializedPresentation.FindProperty("happyFace").objectReferenceValue = happy;
+            serializedPresentation.FindProperty("surprisedFace").objectReferenceValue = surprised;
+            serializedPresentation.ApplyModifiedPropertiesWithoutUndo();
+
+            CompanionBridgeReceiver receiver = bridge.AddComponent<CompanionBridgeReceiver>();
+            SerializedObject serializedReceiver = new SerializedObject(receiver);
+            serializedReceiver.FindProperty("presentationBehaviour").objectReferenceValue = presentation;
+            serializedReceiver.ApplyModifiedPropertiesWithoutUndo();
+
+            bridge.AddComponent<AndroidUnityEventTransport>();
+
+            string scenePath = Generated + "/RobertRoom.unity";
+            if (!EditorSceneManager.SaveScene(scene, scenePath))
+            {
+                throw new InvalidOperationException("Could not save the generated scene.");
+            }
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(scenePath, true) };
+            return scenePath;
+        }
+    }
+}
