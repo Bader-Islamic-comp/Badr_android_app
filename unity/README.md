@@ -221,6 +221,40 @@ The builder therefore unpacks the instance completely before wiring, and then
 calls `Rebind()` and `SetDefaultFace()` itself so a broken binding fails the
 build rather than the device.
 
+## What the device run proved
+
+On an Android 16 x86_64 emulator the app installs, launches without crashing and
+Unity starts in-process:
+
+```
+Unity : Context Type: ActivityOrService
+Unity : Built from '6000.3/staging' ... Scripting Backend 'il2cpp' ...
+Unity : Product Name: Robert Room
+```
+
+The generated scene loads with no errors, so the skin, prefab, Animator and face
+player all resolve at runtime. The composition is in place too — `dumpsys
+activity top` shows Unity's surface full screen beneath a transparent Flutter
+view:
+
+```
+com.unity3d.player.a.g{... 0,0-1080,2400 ... app:id/unitySurfaceView}
+io.flutter.embedding.android.FlutterView{... 0,0-1080,2400 #1}
+  io.flutter.embedding.android.FlutterTextureView{...}
+```
+
+Two things remain before the room is actually seen and driven:
+
+- **Flutter paints over it.** The scaffold and the character stage draw the
+  opaque ivory and sage palette across the whole screen, so the surface behind
+  them is hidden. Showing the room means giving the stage region a transparent
+  window onto it, which is a visual-design change rather than a wiring fix.
+- **The bridge handshake does not complete.** Flutter still falls back to the
+  static avatar, so `unity.ready` is not reaching it. The receiver, transport
+  and host queueing are all in place and unit-tested; what has not been
+  confirmed is the `AndroidJavaClass` hop from the Unity transport into
+  `CompanionEventBridge` on a device.
+
 ## Open device questions
 
 These are unresolved and must be answered on a real Android device before the
