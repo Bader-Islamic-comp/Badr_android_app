@@ -187,6 +187,11 @@ deadline, and its deadline helper had to learn that a startup probe is
 legitimate before any bridge exists — it previously cancelled every call made
 while the room was not ready, which is precisely when the probe runs.
 
+The probe also needs its own, much longer deadline than an ordinary bridge
+message: it waits on the host constructing the engine, which on a slow or
+memory-pressured device takes many seconds. Reusing the 3-second bridge timeout
+reports "no room" on exactly the devices least able to afford losing one.
+
 ### Preparing the room before the handshake
 
 The receiver binds its transport in `Awake`, which only runs once Unity is

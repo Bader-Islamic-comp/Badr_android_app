@@ -21,6 +21,7 @@ class AvatarBridge extends ChangeNotifier {
     MethodChannel? commands,
     EventChannel? events,
     this.timeout = const Duration(seconds: 3),
+    this.surfaceTimeout = const Duration(seconds: 20),
     this.reactionSpacing = const Duration(milliseconds: 1200),
   })  : _commands = commands ?? const MethodChannel('companion/unity_commands'),
         _events = events ?? const EventChannel('companion/unity_events');
@@ -28,6 +29,14 @@ class AvatarBridge extends ChangeNotifier {
   final MethodChannel _commands;
   final EventChannel _events;
   final Duration timeout;
+
+  /// Deadline for [probeSurface] alone.
+  ///
+  /// That query waits on the host constructing the engine, which on a slow or
+  /// memory-pressured device takes far longer than an ordinary bridge message.
+  /// Using [timeout] for it reports "no room" on exactly the devices least able
+  /// to afford losing one.
+  final Duration surfaceTimeout;
 
   /// Minimum gap between queued reactions, so a burst of taps cannot turn into
   /// continuous motion.
@@ -275,7 +284,8 @@ class AvatarBridge extends ChangeNotifier {
           _commands
               .invokeMethod<bool>('roomSurface')
               .then((value) => value ?? false),
-          requireReady: false);
+          requireReady: false,
+          deadline: surfaceTimeout);
     } catch (_) {
       return false;
     }
@@ -395,7 +405,8 @@ class AvatarBridge extends ChangeNotifier {
   /// [requireReady] false is for calls that are legitimate before a bridge
   /// exists, such as asking the host whether it composited a surface at all.
   /// Everything else is abandoned the moment the room is not usable.
-  Future<bool> _wait(Future<bool> source, {bool requireReady = true}) {
+  Future<bool> _wait(Future<bool> source,
+      {bool requireReady = true, Duration? deadline}) {
     final result = Completer<bool>();
     late Timer timer;
     late VoidCallback cancel;
@@ -406,7 +417,7 @@ class AvatarBridge extends ChangeNotifier {
     }
 
     cancel = () => finish(false);
-    timer = Timer(timeout, cancel);
+    timer = Timer(deadline ?? timeout, cancel);
     _cancelWaits.add(cancel);
     source.then(finish, onError: (Object _, StackTrace __) => finish(false));
     if (_disposed || (requireReady && status == AvatarStatus.staticPreview)) {
