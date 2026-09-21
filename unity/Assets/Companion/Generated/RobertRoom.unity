@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &363186238
+--- !u!1 &1171887962
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,30 +127,80 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 363186239}
+  - component: {fileID: 1171887966}
+  - component: {fileID: 1171887965}
+  - component: {fileID: 1171887964}
+  - component: {fileID: 1171887963}
   m_Layer: 0
-  m_Name: Visual Root
+  m_Name: CompanionBridge
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &363186239
+--- !u!114 &1171887963
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1171887962}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 95b3690c1b0bca2438d7b81fb0b4c332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Companion.Presentation::Companion.Presentation.AndroidUnityEventTransport
+--- !u!114 &1171887964
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1171887962}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ddeff92ae730b894a80ba21b6e728120, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Companion.Presentation::Companion.Presentation.CompanionBridgeReceiver
+  presentationBehaviour: {fileID: 1171887965}
+--- !u!114 &1171887965
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1171887962}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be850b38e217e2546a68b9abdde7eb15, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Companion.Presentation::Companion.Presentation.RobertAvatarPresentation
+  skinController: {fileID: 1929477656}
+  neutralFace: {fileID: 2800000, guid: 90bb2e4f257f976449acfc3417e8116d, type: 3}
+  happyFace: {fileID: 2800000, guid: c03cc8e10145eb348ae5a602b37d95a9, type: 3}
+  surprisedFace: {fileID: 2800000, guid: b5ed59044e874cb4bae095d751998314, type: 3}
+  installedCapabilities:
+  - avatar.play
+  - avatar.set_emotion
+  - avatar.set_cosmetics
+  - app.pause
+  - app.resume
+--- !u!4 &1171887966
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 363186238}
+  m_GameObject: {fileID: 1171887962}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1740518963}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &676649062
+--- !u!1 &1430661498
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -158,8 +208,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 676649064}
-  - component: {fileID: 676649063}
+  - component: {fileID: 1430661500}
+  - component: {fileID: 1430661499}
   m_Layer: 0
   m_Name: Key Light
   m_TagString: Untagged
@@ -167,13 +217,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!108 &676649063
+--- !u!108 &1430661499
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 676649062}
+  m_GameObject: {fileID: 1430661498}
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
@@ -232,13 +282,13 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!4 &676649064
+--- !u!4 &1430661500
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 676649062}
+  m_GameObject: {fileID: 1430661498}
   serializedVersion: 2
   m_LocalRotation: {x: 0.0664523, y: 0.90984374, z: -0.37686962, w: 0.16043004}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -247,7 +297,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1515572783
+--- !u!1 &1546389455
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -255,89 +305,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1515572787}
-  - component: {fileID: 1515572786}
-  - component: {fileID: 1515572785}
-  - component: {fileID: 1515572784}
-  m_Layer: 0
-  m_Name: CompanionBridge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1515572784
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1515572783}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 95b3690c1b0bca2438d7b81fb0b4c332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Companion.Presentation::Companion.Presentation.AndroidUnityEventTransport
---- !u!114 &1515572785
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1515572783}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ddeff92ae730b894a80ba21b6e728120, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Companion.Presentation::Companion.Presentation.CompanionBridgeReceiver
-  presentationBehaviour: {fileID: 1515572786}
---- !u!114 &1515572786
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1515572783}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: be850b38e217e2546a68b9abdde7eb15, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Companion.Presentation::Companion.Presentation.RobertAvatarPresentation
-  skinController: {fileID: 1740518962}
-  neutralFace: {fileID: 2800000, guid: 90bb2e4f257f976449acfc3417e8116d, type: 3}
-  happyFace: {fileID: 2800000, guid: c03cc8e10145eb348ae5a602b37d95a9, type: 3}
-  surprisedFace: {fileID: 2800000, guid: b5ed59044e874cb4bae095d751998314, type: 3}
-  installedCapabilities:
-  - avatar.play
-  - avatar.set_emotion
-  - avatar.set_cosmetics
-  - app.pause
-  - app.resume
---- !u!4 &1515572787
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1515572783}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1543786485
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1543786487}
-  - component: {fileID: 1543786486}
+  - component: {fileID: 1546389457}
+  - component: {fileID: 1546389456}
   m_Layer: 0
   m_Name: Room Camera
   m_TagString: Untagged
@@ -345,13 +314,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!20 &1543786486
+--- !u!20 &1546389456
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1543786485}
+  m_GameObject: {fileID: 1546389455}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -396,22 +365,22 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &1543786487
+--- !u!4 &1546389457
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1543786485}
+  m_GameObject: {fileID: 1546389455}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.0000000030491523, y: 0.9975641, z: -0.06975647, w: -0.00000004360491}
-  m_LocalPosition: {x: 0, y: 1.9674729, z: 7.213375}
+  m_LocalRotation: {x: -0.0000000038096983, y: 0.9961947, z: -0.08715574, w: -0.000000043545054}
+  m_LocalPosition: {x: 0, y: 1.4171636, z: 11.157625}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1740518961
+--- !u!1 &1840841666
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -419,8 +388,39 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1740518963}
-  - component: {fileID: 1740518962}
+  - component: {fileID: 1840841667}
+  m_Layer: 0
+  m_Name: Visual Root
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1840841667
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1840841666}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1929477657}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1929477655
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1929477657}
+  - component: {fileID: 1929477656}
   m_Layer: 0
   m_Name: Robert
   m_TagString: Untagged
@@ -428,41 +428,41 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1740518962
+--- !u!114 &1929477656
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1740518961}
+  m_GameObject: {fileID: 1929477655}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5838357a938ebc2409c0133d67f7aaab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Companion.Presentation::RobertCharacter.RobertSkinController
-  visualRoot: {fileID: 363186239}
+  visualRoot: {fileID: 1840841667}
   defaultSkin: {fileID: 11400000, guid: 366ca5ea3cd06374baa70eab80126e20, type: 2}
---- !u!4 &1740518963
+--- !u!4 &1929477657
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1740518961}
+  m_GameObject: {fileID: 1929477655}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 363186239}
+  - {fileID: 1840841667}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1543786487}
-  - {fileID: 676649064}
-  - {fileID: 1740518963}
-  - {fileID: 1515572787}
+  - {fileID: 1546389457}
+  - {fileID: 1430661500}
+  - {fileID: 1929477657}
+  - {fileID: 1171887966}

@@ -461,7 +461,10 @@ namespace Companion.Presentation.Editor
             // Frame the measured model rather than a guessed distance: the
             // character's real size is whatever the artist exported.
             const float fieldOfView = 40f;
-            const float margin = 2.2f;
+            // The page overlays cards from roughly its middle down, so the
+            // character has to fit comfortably in the upper part of the frame
+            // rather than merely fit on screen.
+            const float margin = 3.4f;
             camera.fieldOfView = fieldOfView;
             float extent = Mathf.Max(framing.size.x, framing.size.y, 0.1f);
             float distance =
@@ -471,9 +474,9 @@ namespace Companion.Presentation.Editor
             // room for it.
             camera.transform.position = new Vector3(
                 framing.center.x,
-                framing.center.y + extent * 0.35f,
+                framing.center.y + extent * 0.12f,
                 framing.center.z + distance);
-            camera.transform.rotation = Quaternion.Euler(8f, 180f, 0f);
+            camera.transform.rotation = Quaternion.Euler(10f, 180f, 0f);
 
             GameObject lightObject = new GameObject("Key Light");
             Light light = lightObject.AddComponent<Light>();
