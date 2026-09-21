@@ -177,6 +177,16 @@ Without `onStart`/`onResume` the player never begins rendering, so the scene
 never loads, the receiver's `Awake` never runs, and no handshake is possible —
 with no error from either side.
 
+### The surface query is answered late, not guessed
+
+Dart starts running inside the activity's `onCreate`, so Flutter can ask
+`roomSurface` before the room has been attached. Answering "no" then is wrong
+and would leave the page opaque over a perfectly good room, so the host holds
+that reply until the activity reports the player. Flutter applies its own
+deadline, and its deadline helper had to learn that a startup probe is
+legitimate before any bridge exists — it previously cancelled every call made
+while the room was not ready, which is precisely when the probe runs.
+
 ### Preparing the room before the handshake
 
 The receiver binds its transport in `Awake`, which only runs once Unity is

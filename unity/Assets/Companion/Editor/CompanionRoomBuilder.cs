@@ -146,9 +146,10 @@ namespace Companion.Presentation.Editor
 
             Material faceMaterial = CreateFaceMaterial(neutral);
             AnimatorController controller = CreateAnimator(clips);
-            GameObject prefab = CreatePrefab(model, faceMaterial, controller, neutral);
+            Bounds framing;
+            GameObject prefab = CreatePrefab(model, faceMaterial, controller, neutral, out framing);
             RobertSkinDefinition skin = CreateSkinDefinition(prefab, neutral);
-            string scenePath = CreateScene(skin, neutral, happy, surprised);
+            string scenePath = CreateScene(skin, neutral, happy, surprised, framing);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -264,8 +265,10 @@ namespace Companion.Presentation.Editor
         }
 
         private static GameObject CreatePrefab(
-            GameObject model, Material faceMaterial, AnimatorController controller, Texture2D neutral)
+            GameObject model, Material faceMaterial, AnimatorController controller,
+            Texture2D neutral, out Bounds framing)
         {
+            framing = new Bounds(Vector3.zero, Vector3.one);
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
             try
             {
@@ -301,6 +304,8 @@ namespace Companion.Presentation.Editor
                     throw new InvalidOperationException("The face player rejected the neutral face.");
                 }
 
+                framing = Measure(instance);
+
                 string path = Generated + "/RobertSkin_default.prefab";
                 GameObject saved = PrefabUtility.SaveAsPrefabAsset(instance, path);
                 if (saved == null) throw new InvalidOperationException("Could not save the model prefab.");
@@ -310,6 +315,16 @@ namespace Companion.Presentation.Editor
             {
                 UnityEngine.Object.DestroyImmediate(instance);
             }
+        }
+
+        /// <summary>Combined renderer bounds, so the camera frames the real model.</summary>
+        private static Bounds Measure(GameObject instance)
+        {
+            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) return new Bounds(Vector3.zero, Vector3.one);
+            Bounds total = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) total.Encapsulate(renderers[i].bounds);
+            return total;
         }
 
         private static Renderer FindFaceRenderer(GameObject instance)
@@ -432,7 +447,8 @@ namespace Companion.Presentation.Editor
         }
 
         private static string CreateScene(
-            RobertSkinDefinition skin, Texture2D neutral, Texture2D happy, Texture2D surprised)
+            RobertSkinDefinition skin, Texture2D neutral, Texture2D happy, Texture2D surprised,
+            Bounds framing)
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -442,8 +458,22 @@ namespace Companion.Presentation.Editor
             // Transparent so the Flutter surface above it remains visible; the
             // composition itself still has to be proven on a device.
             camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
-            camera.transform.position = new Vector3(0f, 1.1f, 2.4f);
-            camera.transform.rotation = Quaternion.Euler(6f, 180f, 0f);
+            // Frame the measured model rather than a guessed distance: the
+            // character's real size is whatever the artist exported.
+            const float fieldOfView = 40f;
+            const float margin = 2.2f;
+            camera.fieldOfView = fieldOfView;
+            float extent = Mathf.Max(framing.size.x, framing.size.y, 0.1f);
+            float distance =
+                extent * 0.5f / Mathf.Tan(fieldOfView * 0.5f * Mathf.Deg2Rad) * margin;
+            // Sit a little high and look slightly down, which lifts the
+            // character into the upper part of the frame where the page leaves
+            // room for it.
+            camera.transform.position = new Vector3(
+                framing.center.x,
+                framing.center.y + extent * 0.35f,
+                framing.center.z + distance);
+            camera.transform.rotation = Quaternion.Euler(8f, 180f, 0f);
 
             GameObject lightObject = new GameObject("Key Light");
             Light light = lightObject.AddComponent<Light>();

@@ -41,6 +41,7 @@ internal class UnityRoomPlugin :
     private var events: EventChannel? = null
     private var sink: EventChannel.EventSink? = null
     private var player: UnityPlayerForActivityOrService? = null
+    private var pendingSurface: MethodChannel.Result? = null
     private var receiverBound = false
 
     fun attach(messenger: BinaryMessenger) {
@@ -52,6 +53,8 @@ internal class UnityRoomPlugin :
     /** The activity created and composited the player. */
     fun onPlayerReady(value: UnityPlayerForActivityOrService) {
         player = value
+        pendingSurface?.success(true)
+        pendingSurface = null
     }
 
     fun detach() {
@@ -64,6 +67,8 @@ internal class UnityRoomPlugin :
         queued.clear()
         receiverBound = false
         player = null
+        pendingSurface?.success(false)
+        pendingSurface = null
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -84,7 +89,19 @@ internal class UnityRoomPlugin :
             // Whether a surface is composited is a different question from
             // whether the bridge has negotiated, and the UI needs the first one
             // to decide whether it may paint transparently.
-            "roomSurface" -> result.success(player != null)
+            //
+            // Dart starts running inside the activity's onCreate, so this can
+            // be asked before the room has been attached. Answering "no" then
+            // would be wrong, so the reply is held until the activity reports
+            // the player. The caller applies its own deadline.
+            "roomSurface" -> {
+                if (player != null) {
+                    result.success(true)
+                } else {
+                    pendingSurface?.success(false)
+                    pendingSurface = result
+                }
+            }
             "openRoom" -> result.success(player != null)
             "disposeRoom" -> {
                 // Unity permits one player per process and the activity owns it,
