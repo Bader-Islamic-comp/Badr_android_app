@@ -5,6 +5,8 @@ using System.Linq;
 using RobertCharacter;
 using UnityEditor;
 using UnityEditor.Animations;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -21,7 +23,7 @@ namespace Companion.Presentation.Editor
     /// </summary>
     public static class CompanionRoomBuilder
     {
-        private const string Model = "Assets/Companion/Character/Robert/Robert.glb";
+        private const string Model = "Assets/Companion/Character/Robert/Robert.fbx";
         private const string Faces = "Assets/Companion/Character/Robert/Faces";
         private const string Manifest = Faces + "/animations.json";
         private const string Generated = "Assets/Companion/Generated";
@@ -51,14 +53,80 @@ namespace Companion.Presentation.Editor
             }
         }
 
+        [MenuItem("Companion/Export Android Character Room")]
+        public static void ExportAndroid()
+        {
+            Debug.Log("Companion: exported the character room to " + ExportProject(Build()));
+        }
+
+        /// <summary>Batch entry point: builds the room and exports it, or fails.</summary>
+        public static void ExportAndroidBatch()
+        {
+            try
+            {
+                string output = ExportProject(Build());
+                Console.WriteLine("EXPORT_OK " + output);
+                EditorApplication.Exit(0);
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("EXPORT_FAILED " + error.Message);
+                EditorApplication.Exit(2);
+            }
+        }
+
+        /// <summary>
+        /// Exports a Gradle `unityLibrary` module for the Flutter host to embed.
+        ///
+        /// This targets x86_64 only, which is what the development emulator
+        /// runs. A physical phone needs ARM64, and a store build needs both
+        /// plus its own signing — neither is configured here.
+        /// </summary>
+        private static string ExportProject(string scenePath)
+        {
+            string output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "export"));
+            if (Directory.Exists(output)) Directory.Delete(output, true);
+            Directory.CreateDirectory(output);
+
+            PlayerSettings.SetApplicationIdentifier(
+                NamedBuildTarget.Android, "dev.learningcompanion.companion_mobile");
+            PlayerSettings.companyName = "Learning Companion";
+            PlayerSettings.productName = "Robert Room";
+            PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.X86_64;
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+
+            EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
+            EditorUserBuildSettings.exportAsGoogleAndroidProject = true;
+            EditorUserBuildSettings.buildAppBundle = false;
+
+            BuildPlayerOptions options = new BuildPlayerOptions
+            {
+                scenes = new[] { scenePath },
+                locationPathName = output,
+                target = BuildTarget.Android,
+                options = BuildOptions.AcceptExternalModificationsToPlayer
+            };
+            BuildReport report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    "Android export finished as " + report.summary.result +
+                    " with " + report.summary.totalErrors + " errors.");
+            }
+            return output;
+        }
+
         private static string Build()
         {
+            ConfigureModelImporter();
+
             GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(Model);
             if (model == null)
             {
                 throw new InvalidOperationException(
-                    "No imported model at " + Model +
-                    ". Install a glTF importer that produces a GameObject asset.");
+                    "No imported model at " + Model + ". Regenerate it with " +
+                    "tools/export_robert_fbx.py from the canonical Blender source.");
             }
 
             Dictionary<string, AnimationClip> clips = LoadBodyClips();
@@ -80,13 +148,50 @@ namespace Companion.Presentation.Editor
             return scenePath;
         }
 
+        /// <summary>
+        /// Pins the import settings the rig contract depends on, rather than
+        /// inheriting whatever default the Editor happened to apply.
+        /// </summary>
+        private static void ConfigureModelImporter()
+        {
+            ModelImporter importer = AssetImporter.GetAtPath(Model) as ModelImporter;
+            if (importer == null)
+            {
+                throw new InvalidOperationException(
+                    "No model importer for " + Model + ". Is the file present and an FBX?");
+            }
+            importer.animationType = ModelImporterAnimationType.Generic;
+            importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+            importer.importAnimation = true;
+            importer.importConstraints = false;
+            importer.importCameras = false;
+            importer.importLights = false;
+            importer.importBlendShapes = false;
+            // A material is needed in slot 0 so the face renderer can be found;
+            // the generated unlit material replaces it immediately after.
+            importer.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
+            importer.SaveAndReimport();
+        }
+
+        /// <summary>
+        /// Blender exports one take per action, which Unity names
+        /// `Armature|Action`. Match on the action, not the qualified take name.
+        /// </summary>
+        private static string ClipName(string name)
+        {
+            int separator = name.LastIndexOf('|');
+            return separator >= 0 ? name.Substring(separator + 1) : name;
+        }
+
         private static Dictionary<string, AnimationClip> LoadBodyClips()
         {
             var found = new Dictionary<string, AnimationClip>(StringComparer.OrdinalIgnoreCase);
             foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(Model))
             {
                 AnimationClip clip = asset as AnimationClip;
-                if (clip != null && !found.ContainsKey(clip.name)) found[clip.name] = clip;
+                if (clip == null) continue;
+                string name = ClipName(clip.name);
+                if (!found.ContainsKey(name)) found[name] = clip;
             }
             var missing = BodyClips.Where(name => !found.ContainsKey(name)).ToArray();
             if (missing.Length > 0)

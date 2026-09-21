@@ -19,7 +19,18 @@ android {
         applicationId = "dev.learningcompanion.companion_mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // The exported unityLibrary declares minSdk 25, so the app cannot ask
+        // for less or the manifest merge fails.
+        minSdk = maxOf(flutter.minSdkVersion, 25)
+        if (rootProject.findProject(":unityLibrary") != null) {
+            // The current export is x86_64 only, which is what the development
+            // emulator runs. Match it so the APK cannot ship a Flutter ABI with
+            // no Unity runtime beside it. A phone build needs an ARM64 export.
+            ndk {
+                abiFilters.clear()
+                abiFilters.add("x86_64")
+            }
+        }
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
@@ -48,6 +59,13 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
+dependencies {
+    // Present only when the room has been exported; see settings.gradle.kts.
+    if (rootProject.findProject(":unityLibrary") != null) {
+        implementation(project(":unityLibrary"))
     }
 }
 

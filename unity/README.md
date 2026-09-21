@@ -1,9 +1,11 @@
 # Robert presentation integration kit
 
-An importable kit, not an Editor-created Unity project: no `ProjectSettings/`,
-scene YAML or platform export is fabricated here. The scripts are nonetheless
-compiled and exercised in a real Editor by `validation/Test-EditMode.ps1`, which
-builds a throwaway project outside the repository.
+A real Unity project. `Assets/`, `Packages/` and `ProjectSettings/` are tracked;
+`Library/`, `Temp/` and the `export/` build output are not.
+
+`Assets/Companion/Generated/` is produced by the room builder and can be deleted
+and rebuilt at any time. The canonical character package under
+`../assets/characters/robert/` stays authoritative: the builder never edits it.
 
 Verified with Unity 6000.3.24f1 (Android Build Support, bundled OpenJDK/SDK/NDK)
 and the Android toolchain (SDK 36, build-tools 36.0.0, JetBrains Runtime 25).
@@ -54,33 +56,47 @@ Neither suite is a substitute for importer verification, scene inspection,
 rendering checks or Android device tests. The kit intentionally leaves those
 gates open.
 
-## Import and create the room
+## Building the room
 
-1. Create a project with a supported Unity Editor using the Built-in or
-   Universal Render Pipeline, and copy `Assets/Companion` into its `Assets`
-   directory. Let the Editor generate `.meta` files and commit them with that
-   project.
-2. Copy the three character helpers from
-   `../assets/characters/robert/unity/` (`RobertFacePlayer.cs`,
-   `RobertSkinController.cs`, `RobertSkinDefinition.cs`) into
-   `Assets/Companion/Character/` so they compile into the same assembly that
-   `RobertAvatarPresentation` references. Keep them byte-identical to the
-   canonical package.
-3. Install a glTF importer compatible with that Editor and pipeline. It must
-   import `../assets/characters/robert/skins/default/model/Robert.glb` as a
-   `GameObject` asset exposing four nonempty `AnimationClip` subassets named
-   exactly **Idle**, **Wave**, **Nod** and **Celebrate**. The kit neither
-   supplies nor silently installs one.
-4. Follow `../assets/characters/robert/unity/README.md` for the Inspector setup
-   of the face player, the unlit face material and the skin definition. Convert
-   the millisecond timings in `shared/faces/default/animations.json` to seconds;
-   they are not imported automatically.
-5. Build a `CompanionBridge` GameObject carrying `CompanionBridgeReceiver`,
-   `RobertAvatarPresentation` and `AndroidUnityEventTransport`. Assign the skin
-   controller, the Animator and the neutral, happy and surprised PNGs. Set the
-   receiver's presentation reference to the `RobertAvatarPresentation`.
-6. Inspect in Play Mode: front-facing camera, scale, rig deformation, PNG
-   orientation, every body clip, return to Idle, and pause/resume.
+**Companion > Create Robert Development Room** generates everything from the
+staged assets: the unlit face material, an Animator whose one-shot states return
+to Idle, the model prefab with its face player wired from the approved timing
+manifest, the skin definition, and the room scene with the bridge GameObject.
+It validates the model, the four rig clips and the manifest first, and refuses
+rather than fabricating a substitute.
+
+**Companion > Export Android Character Room** does that and then exports the
+Gradle `unityLibrary` module into `export/`, which
+`../android/settings.gradle.kts` includes when it is present. Both have batch
+entry points (`CompanionRoomBuilder.BuildRoomBatch` and `ExportAndroidBatch`),
+which is how they are actually run here, via `-batchmode -executeMethod`.
+
+The export targets **x86_64 only**, which is what the development emulator runs.
+A physical phone needs an ARM64 export, and a store build needs both plus its own
+signing; neither is configured.
+
+### Why FBX and not the GLB
+
+The canonical runtime model is `Robert.glb`, but it is **not** what this project
+imports. `com.unity.cloud.gltfast` 6.13.0 cannot import it at all: its
+skinned-mesh path throws before producing an asset.
+
+```
+InvalidOperationException: The previously scheduled job SortAndNormalizeBoneWeightsJob
+writes to NativeArray<VBones> ... You must call JobHandle.Complete() ...
+  at GLTFast.MeshGenerator.GenerateMesh (MeshGenerator.cs:189)
+```
+
+That is an upstream defect in the importer, triggered by any skinned mesh — ours
+has a 24-bone rig. Rather than disable Unity's job safety checks to paper over a
+real race, `tools/export_robert_fbx.py` exports `Robert.fbx` from the canonical
+`Robert.blend` with Blender, and Unity's own FBX importer handles it. That drops
+the third-party importer entirely and keeps the same source of truth.
+
+The export keeps only `FaceScreen`, `Robert_Body` and `Robert_Rig` — the
+canonical scene's camera, lights and studio floor are for renders, and the room
+builds its own. Blender writes one take per action, which Unity names
+`Robert_Rig|Idle`, so the builder matches on the action name.
 
 ## Flutter/native boundary
 

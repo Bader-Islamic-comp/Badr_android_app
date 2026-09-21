@@ -4,6 +4,9 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Companion/Generated/RobertRoom.unity
+    guid: f4061df98e0aab6418992b379ffb090c
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0

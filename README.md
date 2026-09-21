@@ -20,7 +20,7 @@ implemented.
 | `lib/` | Application source: `bridge/`, `data/`, `domain/`, `ui/` |
 | `assets/` | Runtime assets only — the static preview and the Robert character package |
 | `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked) |
-| `unity/` | Importable presentation kit and its runnable bridge-core probe |
+| `unity/` | The Unity character-room project, its room builder and its test scripts |
 | `archive/` | Untracked: superseded character revisions and the packaged distributable |
 | `contracts/` | Versioned API and bridge schemas shared with `comp-server` |
 | `doc/`, `docs/` | Roadmap, development boundary, and the character-page design |
@@ -105,6 +105,15 @@ only — no microphone, camera or location permission. **Nothing has been run on
 device or emulator**: none is available here, so startup, memory, frame time,
 TalkBack, keyboard insets and rotation are all still unmeasured, and no
 performance budget has been approved to measure against.
+
+`android/settings.gradle.kts` includes the exported Unity room as
+`:unityLibrary` **only when `unity/export/unityLibrary` exists**, so the app
+still builds without an export and Flutter keeps its static avatar. The module
+reads `unityStreamingAssets` and `unity.*` Gradle properties that live in the
+export's own `gradle.properties`; settings reads them from there rather than
+committing absolute SDK and NDK paths. An export forces `minSdk 25` and, for the
+current x86_64-only export, restricts the app's ABIs to match so the APK cannot
+ship a Flutter ABI with no Unity runtime beside it.
 
 Release builds shrink with R8. `android/app/proguard-rules.pro` keeps
 `CompanionEventBridge`, which the Unity receiver reaches by name over JNI;

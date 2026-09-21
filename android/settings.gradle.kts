@@ -24,3 +24,29 @@ plugins {
 }
 
 include(":app")
+
+// The Unity character room, exported by
+// `unity/Assets/Companion/Editor/CompanionRoomBuilder.cs` into `unity/export`.
+// It is a build output, not source, so the app only depends on it when an
+// export is actually present: without one the app still builds and Flutter
+// keeps its static avatar.
+val unityLibrary = file("../unity/export/unityLibrary")
+if (unityLibrary.isDirectory) {
+    include(":unityLibrary")
+    project(":unityLibrary").projectDir = unityLibrary
+
+    // The exported module reads `unityStreamingAssets` and `unity.*` properties
+    // that live in the export's own gradle.properties, which this build never
+    // loads. They include absolute SDK and NDK paths for the machine that ran
+    // the export, so they are read from the export rather than committed here.
+    val exported = java.util.Properties()
+    file("../unity/export/gradle.properties").inputStream().use { exported.load(it) }
+    gradle.beforeProject {
+        if (path == ":unityLibrary") {
+            exported.forEach { key, value ->
+                val name = key.toString()
+                if (name.startsWith("unity")) extensions.extraProperties[name] = value
+            }
+        }
+    }
+}

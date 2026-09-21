@@ -122,9 +122,24 @@ whenever the transport won that race the room would have refused the binding and
 silently never announced readiness. The receiver now resolves its session on
 first need instead.
 
-`RobertAvatarPresentation` and `AndroidUnityEventTransport` compile but have
-never executed: the first needs an imported model and a scene, the second an
-Android export and a device.
+`unity/` is now a real Unity project with a room builder
+(`CompanionRoomBuilder`) that generates the face material, the Animator, the
+model prefab, the skin definition and the room scene from the staged canonical
+assets, and exports a Gradle `unityLibrary` module.
+
+Two things had to change to get there. The glTF importer
+`com.unity.cloud.gltfast` 6.13.0 cannot import the canonical `Robert.glb` at
+all — its skinned-mesh path throws a Jobs safety violation before producing an
+asset, and our rig is skinned. Rather than disable Unity's job safety checks to
+mask a real race, the model is exported to FBX from the canonical `Robert.blend`
+with Blender and imported by Unity natively, which removes the third-party
+importer entirely. And `RobertAvatarPresentation` held a serialized `Animator`
+reference that could never resolve, because the Animator belongs to a prefab the
+skin controller instantiates at runtime.
+
+`android/settings.gradle.kts` includes `:unityLibrary` only when an export
+exists, feeding it the `unity.*` properties from the export's own
+`gradle.properties` so no absolute SDK or NDK path is committed.
 
 ### Acceptance evidence, item by item
 
