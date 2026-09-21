@@ -91,27 +91,41 @@ Recorded 2026-09-21. This records what exists, not what is approved.
 - `BridgeCommand` and `BridgeSession`, the Unity receiver's decision core,
   written dependency-free and exercised by 34 compiled checks.
 
-### Written but not compiled or run
+### Compiled, but never executed
 
-No Unity Editor, Android SDK or JDK exists in this environment, so none of this
-has been built, let alone run on a device:
+An Android SDK and the JetBrains Runtime from Android Studio are now installed,
+so `android/app/src/main/kotlin/.../UnityRoomPlugin.kt`, `UnityRuntime.kt` and
+`MainActivity.kt` **compile** and land in both a debug and a release APK.
+Compiling confirmed the `FlutterActivityLaunchConfigs.BackgroundMode` import and
+the override signatures, and the release build exposed a defect that a debug
+build hides: R8 renamed `CompanionEventBridge`, which the Unity receiver reaches
+by name over JNI, so the Unity-to-Flutter event path would have failed in
+release only. `android/app/proguard-rules.pro` now keeps it, verified by
+inspecting the release DEX.
+
+No device or emulator is available, so none of this Kotlin has ever executed.
+
+`UnityRuntime` reaches the player reflectively, so the app builds and runs
+without an exported `unityLibrary` module; in that state the bridge reports no
+room and Flutter keeps its static avatar.
+
+### Still not compiled
+
+No Unity Editor is installed — only Unity Hub, whose editor list is empty — so
+these remain unbuilt:
 
 - `unity/Assets/Companion/Runtime/CompanionBridgeReceiver.cs`,
   `RobertAvatarPresentation.cs` and `AndroidUnityEventTransport.cs`.
-- `android/app/src/main/kotlin/.../UnityRoomPlugin.kt`, `UnityRuntime.kt` and
-  the `MainActivity.kt` changes.
-
-`UnityRuntime` reaches the player reflectively so the app still builds and runs
-without an exported `unityLibrary` module; in that state the bridge reports no
-room and Flutter keeps its static avatar.
 
 ### Acceptance evidence, item by item
 
 1. Asset validation — **not run.** `assets/characters/robert/tools/verify_robert.py`
    exists and was not executed; no user asset was overwritten.
-2. Unity and Android host compile and 3D runtime loading — **blocked.** No Unity
-   Editor, Android SDK or JDK. No motion is applied to the static image in
-   place of the real runtime.
+2. Unity and Android host compile and 3D runtime loading — **partial.** The
+   Android host compiles into debug and release APKs. Unity compilation is
+   still blocked: no Editor is installed, so there is no export and no 3D
+   runtime has been loaded. No motion is applied to the static image in place
+   of the real runtime.
 3. Device idle/blink, one-shot return, pause and reduced motion — **blocked**
    for the device; the Flutter-side policy that drives them is tested.
 4. Timeout, missing assets, unsupported capability and process recreation —
@@ -124,5 +138,7 @@ room and Flutter keeps its static avatar.
    **partial.** Large text and a 320px viewport are tested, and the orientation
    buttons are now in the accessibility tree. TalkBack, real keyboard insets and
    rotation need a device.
-7. Startup, memory, frame time and package size — **blocked.** No device and no
-   approved budgets. No low-end-device performance claim is made.
+7. Startup, memory, frame time and package size — **partial.** The release APK
+   is 49.3 MB without a Unity export; startup, memory and frame time need a
+   device, and no budgets have been approved to measure against. No
+   low-end-device performance claim is made.

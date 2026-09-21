@@ -2,10 +2,14 @@
 
 An importable kit, not an Editor-created or compiled Unity project. No
 `ProjectSettings/`, scene YAML or platform export is fabricated here. Unity Hub
-is installed on the development machine, but **no Unity Editor was found**
-through command lookup or its standard Editor directory, and no Android SDK or
-JDK is present either. Unity compilation, rendering, EditMode tests and every
-device measurement therefore remain **unverified**.
+is installed on the development machine, but **no Unity Editor is installed** —
+the Hub's editor list is empty and the only `unity.exe` files present are the
+Hub's own CLI and licensing shims. Unity compilation, rendering and EditMode
+tests therefore remain **unverified**.
+
+The Android toolchain is now present (SDK 36, build-tools 36.0.0, JetBrains
+Runtime 25 from Android Studio), so the Kotlin host compiles. No device or
+emulator is available, so nothing has been **run**.
 
 ## What is and is not verified
 
@@ -16,7 +20,7 @@ device measurement therefore remain **unverified**.
 | `Assets/Companion/Runtime/CompanionBridgeReceiver.cs` | Uncompiled — needs `UnityEngine` |
 | `Assets/Companion/Runtime/RobertAvatarPresentation.cs` | Uncompiled — needs `UnityEngine` |
 | `Assets/Companion/Runtime/AndroidUnityEventTransport.cs` | Uncompiled — needs `UnityEngine` |
-| `../android/.../UnityRoomPlugin.kt`, `UnityRuntime.kt`, `MainActivity.kt` | Uncompiled — no JDK or Android SDK |
+| `../android/.../UnityRoomPlugin.kt`, `UnityRuntime.kt`, `MainActivity.kt` | **Compiles** into debug and release APKs; never executed |
 
 `BridgeCommand` and `BridgeSession` are deliberately free of engine and
 third-party dependencies, including the JSON reader, so the part of the contract
@@ -105,6 +109,10 @@ character room is treated as a capability rather than a prototype:
   not been approved yet.
 - Crash and lifecycle behaviour across background, rotation and process death.
 - Whether the reflective names in `UnityRuntime.kt` match the actual export.
+- Whether `CompanionEventBridge` survives release shrinking in the final app.
+  R8 renames it by default, which breaks the Unity-to-Flutter event path in
+  release builds only; `android/app/proguard-rules.pro` keeps it, and that rule
+  must be re-checked whenever the transport's class or method names change.
 
 If the composition fails, keep the static Flutter screen and report the
 limitation for design revision. Do not substitute a web renderer, a

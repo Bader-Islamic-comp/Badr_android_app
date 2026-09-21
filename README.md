@@ -98,13 +98,26 @@ flutter run
 
 Run `dart format lib test`, `flutter analyze` and `flutter test` after changes.
 
-iOS platform builds require macOS and Xcode. **Android and iOS device builds
-have not been run**, and no Android SDK or JDK is present in the current
-development environment. The included web target provides an offline development
-preview (`flutter build web --no-web-resources-cdn`); web API testing requires
-explicit backend CORS configuration, which is currently disabled. Native Unity
-integration is not available in any wrapper until the native host is compiled and
-validated on a device.
+Android builds succeed: `flutter build apk --debug` and `--release` both
+produce an APK (release 49.3 MB), and the Kotlin host in
+`android/app/src/main/kotlin/` compiles into both. The APK requests `INTERNET`
+only — no microphone, camera or location permission. **Nothing has been run on a
+device or emulator**: none is available here, so startup, memory, frame time,
+TalkBack, keyboard insets and rotation are all still unmeasured, and no
+performance budget has been approved to measure against.
+
+Release builds shrink with R8. `android/app/proguard-rules.pro` keeps
+`CompanionEventBridge`, which the Unity receiver reaches by name over JNI;
+without that rule R8 renames it and the Unity-to-Flutter event path fails in
+release builds only. Re-check that rule if the transport's class or method names
+change.
+
+iOS platform builds require macOS and Xcode and have not been run. The included
+web target provides an offline development preview
+(`flutter build web --no-web-resources-cdn`); web API testing requires explicit
+backend CORS configuration, which is currently disabled. A live character room is
+still unavailable in every wrapper: no Unity Editor is installed, so no
+`unityLibrary` export exists and `UnityRuntime` finds no player to create.
 
 The default run performs no backend requests. It supports a local orientation,
 labels local completion accurately and never invents a reward balance. The parent
