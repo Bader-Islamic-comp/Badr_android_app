@@ -62,9 +62,21 @@ internal class UnityRoomPlugin(private val activity: Activity) :
         teardown()
     }
 
-    fun pause() = runtime?.pause()
+    fun onStart() = runtime?.onStart()
 
-    fun resume() = runtime?.resume()
+    fun onResume() {
+        runtime?.onResume()
+        runtime?.resume()
+    }
+
+    fun onPause() {
+        runtime?.pause()
+        runtime?.onPause()
+    }
+
+    fun onStop() = runtime?.onStop()
+
+    fun windowFocusChanged(hasFocus: Boolean) = runtime?.windowFocusChanged(hasFocus)
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -118,6 +130,8 @@ internal class UnityRoomPlugin(private val activity: Activity) :
             teardown()
             return
         }
+        created.onStart()
+        created.onResume()
         created.resume()
     }
 

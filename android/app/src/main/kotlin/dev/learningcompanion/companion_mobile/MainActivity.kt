@@ -30,15 +30,31 @@ class MainActivity : FlutterActivity() {
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
-    override fun onPause() {
-        // Flutter also sends `app.pause` through the bridge; this stops the
-        // player loop itself so a backgrounded room costs nothing.
-        room?.pause()
-        super.onPause()
+    // Unity-as-a-Library only runs if the host forwards the activity lifecycle.
+    // Flutter also sends `app.pause` through the bridge, but that is a
+    // presentation cue; these are what start and stop the player itself.
+    override fun onStart() {
+        super.onStart()
+        room?.onStart()
     }
 
     override fun onResume() {
         super.onResume()
-        room?.resume()
+        room?.onResume()
+    }
+
+    override fun onPause() {
+        room?.onPause()
+        super.onPause()
+    }
+
+    override fun onStop() {
+        room?.onStop()
+        super.onStop()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        room?.windowFocusChanged(hasFocus)
     }
 }

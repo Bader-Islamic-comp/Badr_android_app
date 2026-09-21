@@ -162,6 +162,21 @@ watermark untouched so the sender can reuse that sequence.
 No credentials, networking, conversation state, rewards, persistence, text or
 audio belongs in this assembly.
 
+### The host must drive Unity's lifecycle
+
+`UnityPlayerActivity` in the export is the reference for what a host owes the
+player, and it is more than constructing it:
+
+- it adds **`getFrameLayout()`** to the hierarchy, not `getView()` — `getView()`
+  returns the inner surface, which already sits inside that frame layout and so
+  cannot be re-parented;
+- it forwards `onStart`, `onResume`, `onPause`, `onStop`, `destroy`,
+  `windowFocusChanged` and `configurationChanged`.
+
+Without `onStart`/`onResume` the player never begins rendering, so the scene
+never loads, the receiver's `Awake` never runs, and no handshake is possible —
+with no error from either side.
+
 ### Preparing the room before the handshake
 
 The receiver binds its transport in `Awake`, which only runs once Unity is

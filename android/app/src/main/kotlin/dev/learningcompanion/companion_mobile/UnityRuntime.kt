@@ -21,8 +21,15 @@ import android.view.View
  */
 internal class UnityRuntime private constructor(private val player: Any) {
 
+    /**
+     * The view to add to the host hierarchy.
+     *
+     * `UnityPlayerActivity` uses `getFrameLayout()`, not `getView()`:
+     * `getView()` returns the inner surface, which already sits inside that
+     * frame layout and therefore cannot be re-parented.
+     */
     val view: View?
-        get() = invoke("getView") as? View
+        get() = (invoke("getFrameLayout") ?: invoke("getView")) as? View
 
     fun send(gameObject: String, method: String, payload: String) {
         playerClass(player)
@@ -40,6 +47,35 @@ internal class UnityRuntime private constructor(private val player: Any) {
 
     fun destroy() {
         invoke("destroy")
+    }
+
+    // Unity-as-a-Library expects the host to forward the activity lifecycle.
+    // Without onStart/onResume the player never begins rendering the scene, so
+    // the receiver's Awake never runs and no handshake is possible.
+    fun onStart() {
+        invoke("onStart")
+    }
+
+    fun onResume() {
+        invoke("onResume")
+    }
+
+    fun onPause() {
+        invoke("onPause")
+    }
+
+    fun onStop() {
+        invoke("onStop")
+    }
+
+    fun windowFocusChanged(hasFocus: Boolean) {
+        try {
+            playerClass(player)
+                .getMethod("windowFocusChanged", Boolean::class.javaPrimitiveType)
+                .invoke(player, hasFocus)
+        } catch (error: ReflectiveOperationException) {
+            // An export without this hook simply does not get focus updates.
+        }
     }
 
     private fun invoke(name: String): Any? = try {
