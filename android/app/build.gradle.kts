@@ -22,14 +22,12 @@ android {
         // The exported unityLibrary declares minSdk 25, so the app cannot ask
         // for less or the manifest merge fails.
         minSdk = maxOf(flutter.minSdkVersion, 25)
-        if (rootProject.findProject(":unityLibrary") != null) {
-            // The current export is x86_64 only, which is what the development
-            // emulator runs. Match it so the APK cannot ship a Flutter ABI with
-            // no Unity runtime beside it. A phone build needs an ARM64 export.
-            ndk {
-                abiFilters.clear()
-                abiFilters.add("x86_64")
-            }
+        // The current export is x86_64 only, which is what the development
+        // emulator runs. Match it so the APK cannot ship a Flutter ABI with no
+        // Unity runtime beside it. A phone build needs an ARM64 export.
+        ndk {
+            abiFilters.clear()
+            abiFilters.add("x86_64")
         }
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
@@ -63,10 +61,15 @@ kotlin {
 }
 
 dependencies {
-    // Present only when the room has been exported; see settings.gradle.kts.
-    if (rootProject.findProject(":unityLibrary") != null) {
-        implementation(project(":unityLibrary"))
-    }
+    // MainActivity implements Unity's host interfaces, so the export is a hard
+    // requirement. Build it with `CompanionRoomBuilder.ExportAndroidBatch`
+    // before building the app.
+    implementation(project(":unityLibrary"))
+    // The exported module consumes its own classes with `implementation
+    // fileTree(...)`, so Unity's types are not on this module's compile
+    // classpath. Add the jar for compilation only: unityLibrary already
+    // packages it, and duplicating it would collide at dex time.
+    compileOnly(files("../../unity/export/unityLibrary/libs/unity-classes.jar"))
 }
 
 flutter {

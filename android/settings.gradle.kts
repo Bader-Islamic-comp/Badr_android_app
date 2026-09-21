@@ -27,11 +27,13 @@ include(":app")
 
 // The Unity character room, exported by
 // `unity/Assets/Companion/Editor/CompanionRoomBuilder.cs` into `unity/export`.
-// It is a build output, not source, so the app only depends on it when an
-// export is actually present: without one the app still builds and Flutter
-// keeps its static avatar.
+// MainActivity implements Unity's host interfaces, so this is required rather
+// than optional: fail with an actionable message instead of a missing symbol.
 val unityLibrary = file("../unity/export/unityLibrary")
-if (unityLibrary.isDirectory) {
+require(unityLibrary.isDirectory) {
+    "No Unity export at ${unityLibrary.path}. Run CompanionRoomBuilder.ExportAndroidBatch first."
+}
+run {
     include(":unityLibrary")
     project(":unityLibrary").projectDir = unityLibrary
 
