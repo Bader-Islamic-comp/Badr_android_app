@@ -16,10 +16,14 @@ class TalkPage extends StatelessWidget {
     required this.room,
     required this.onTapCharacter,
     required this.onStartOrientation,
+    this.overRoom = false,
   });
 
   final CompanionController model;
   final AvatarRoom room;
+
+  /// True when a room is composited behind the page.
+  final bool overRoom;
   final VoidCallback onTapCharacter;
   final VoidCallback onStartOrientation;
 
@@ -41,6 +45,7 @@ class TalkPage extends StatelessWidget {
                     status: room.status,
                     animating: room.bridge.animating,
                     motionEnabled: room.motionEnabled,
+                    surfaceAttached: overRoom,
                     onTapCharacter: onTapCharacter,
                     onOpenRoom: room.status == AvatarStatus.ready
                         ? room.openRoom
@@ -57,12 +62,14 @@ class TalkPage extends StatelessWidget {
                   else
                     _reply(context),
                   if (model.canRetryQuestion)
-                    const Padding(
-                        padding: EdgeInsets.only(top: 12),
-                        child: Text(
-                            'Retry keeps the same request so the service never '
-                            'receives a duplicate submission.',
-                            style: TextStyle(fontSize: 13, color: muted))),
+                    Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Scrim(
+                            enabled: overRoom,
+                            child: const Text(
+                                'Retry keeps the same request so the service '
+                                'never receives a duplicate submission.',
+                                style: TextStyle(fontSize: 13, color: muted)))),
                   if (model.hasConversation || model.canRetryQuestion)
                     Padding(
                         padding: const EdgeInsets.only(top: 12),

@@ -11,6 +11,14 @@ const sand = Color(0xFFF3E6D1);
 const hairline = Color(0xFFE2E5DB);
 const muted = Color(0xFF4F6D6B);
 
+/// Scrims for the full-bleed layout. When the character room is composited
+/// behind Flutter the page itself is transparent, so anything carrying text
+/// needs its own surface: a 3D scene is not a background you can rely on for
+/// contrast. Each is the ordinary colour at high opacity, so the palette reads
+/// the same whether or not a room is present.
+const ivoryScrim = Color(0xF2FAF7EF);
+const sandScrim = Color(0xF2F3E6D1);
+
 ThemeData companionTheme() => ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: ivory,
@@ -47,7 +55,7 @@ ThemeData companionTheme() => ThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       )),
       navigationBarTheme: const NavigationBarThemeData(
-        backgroundColor: ivory,
+        backgroundColor: ivoryScrim,
         indicatorColor: sage,
         height: 64,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,

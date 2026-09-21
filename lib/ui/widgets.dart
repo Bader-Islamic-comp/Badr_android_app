@@ -35,17 +35,40 @@ class SectionLabel extends StatelessWidget {
       );
 }
 
+/// Gives text its own surface when the page is transparent over a live room.
+/// A 3D scene cannot be relied on for contrast.
+class Scrim extends StatelessWidget {
+  const Scrim({super.key, required this.child, this.enabled = true});
+  final Widget child;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+          color: ivoryScrim, borderRadius: BorderRadius.circular(12)),
+      child: child,
+    );
+  }
+}
+
 /// The adult-operator notice. It stays until the release gates in
 /// `doc/development-boundary.md` pass.
 class DevelopmentBanner extends StatelessWidget {
-  const DevelopmentBanner({super.key});
+  const DevelopmentBanner({super.key, this.overRoom = false});
+
+  /// Opaque over a live room so the warning is never hard to read.
+  final bool overRoom;
 
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration:
-            BoxDecoration(color: sand, borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(
+            color: overRoom ? sandScrim : sand,
+            borderRadius: BorderRadius.circular(10)),
         child: const Text(
           'ADULT DEVELOPMENT PREVIEW · Synthetic data only. Not ready for children.',
           style:

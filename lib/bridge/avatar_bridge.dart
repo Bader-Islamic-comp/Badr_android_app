@@ -261,6 +261,26 @@ class AvatarBridge extends ChangeNotifier {
     }
   }
 
+  /// Whether the host has a room surface composited at all.
+  ///
+  /// Deliberately independent of [status]: the surface exists as soon as the
+  /// host attaches it, long before — or entirely without — a negotiated
+  /// bridge. The UI needs this to decide whether it may paint transparently,
+  /// and painting transparently with nothing behind it would show through to
+  /// an empty window.
+  Future<bool> probeSurface() async {
+    if (_disposed) return false;
+    try {
+      return await _wait(
+          _commands
+              .invokeMethod<bool>('roomSurface')
+              .then((value) => value ?? false),
+          requireReady: false);
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> openRoom() async {
     if (status != AvatarStatus.ready) return false;
     try {
@@ -372,7 +392,10 @@ class AvatarBridge extends ChangeNotifier {
 
   // Future.timeout timers cannot be cancelled when a native host disappears.
   // Own deadlines explicitly so fallback/disposal settles all pending work.
-  Future<bool> _wait(Future<bool> source) {
+  /// [requireReady] false is for calls that are legitimate before a bridge
+  /// exists, such as asking the host whether it composited a surface at all.
+  /// Everything else is abandoned the moment the room is not usable.
+  Future<bool> _wait(Future<bool> source, {bool requireReady = true}) {
     final result = Completer<bool>();
     late Timer timer;
     late VoidCallback cancel;
@@ -386,7 +409,9 @@ class AvatarBridge extends ChangeNotifier {
     timer = Timer(timeout, cancel);
     _cancelWaits.add(cancel);
     source.then(finish, onError: (Object _, StackTrace __) => finish(false));
-    if (_disposed || status == AvatarStatus.staticPreview) cancel();
+    if (_disposed || (requireReady && status == AvatarStatus.staticPreview)) {
+      cancel();
+    }
     return result.future;
   }
 

@@ -3,20 +3,22 @@ import 'package:flutter/material.dart';
 import '../bridge/avatar_bridge.dart';
 import '../theme.dart';
 
-/// The central character room of the main page.
+/// The character room's place on the main page.
 ///
-/// Robert's 3D presentation belongs to Unity. Until the native
-/// Unity-as-a-Library host is integrated and validated on a device, this
-/// renders the supplied static preview. It deliberately applies no motion to
-/// that image: animating a PNG would misrepresent an unimplemented 3D runtime.
-/// When a host exists, the Unity surface composites behind [_roomSurface] and
-/// Flutter keeps every interactive control above it.
+/// With a room composited behind Flutter the page is full-bleed: this reserves
+/// the space and stays transparent so the live 3D shows through, carrying only
+/// a status line and the tap target. Without one it falls back to the supplied
+/// static preview on its own card.
+///
+/// It deliberately applies no motion to that static image: animating a PNG
+/// would misrepresent a 3D runtime that is not there.
 class CharacterStage extends StatelessWidget {
   const CharacterStage({
     super.key,
     required this.status,
     required this.animating,
     required this.motionEnabled,
+    required this.surfaceAttached,
     this.onTapCharacter,
     this.onOpenRoom,
   });
@@ -27,6 +29,10 @@ class CharacterStage extends StatelessWidget {
   /// move. Only the room's own renderer acts on it.
   final bool animating;
   final bool motionEnabled;
+
+  /// True when a room surface is composited behind Flutter, so this may be a
+  /// transparent window rather than a static card.
+  final bool surfaceAttached;
   final VoidCallback? onTapCharacter;
   final VoidCallback? onOpenRoom;
 
@@ -36,7 +42,9 @@ class CharacterStage extends StatelessWidget {
         AvatarStatus.ready =>
           animating ? 'Character room · playing' : 'Character room · paused',
         AvatarStatus.connecting => 'Looking for the character room…',
-        AvatarStatus.staticPreview => 'Robert · static preview',
+        AvatarStatus.staticPreview => surfaceAttached
+            ? 'Character room · not connected'
+            : 'Robert · static preview',
       };
 
   @override
@@ -51,17 +59,18 @@ class CharacterStage extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(compact ? 12 : 18),
             decoration: BoxDecoration(
-                color: sage, borderRadius: BorderRadius.circular(28)),
+                // Transparent over a live room; the sage card only frames the
+                // static preview.
+                color: surfaceAttached ? Colors.transparent : sage,
+                borderRadius: BorderRadius.circular(28)),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _statusRow(),
                 const SizedBox(height: 8),
-                if (figure >= 72)
-                  Flexible(child: _roomSurface(height: figure))
-                else
-                  Flexible(child: _roomSurface(height: 72)),
+                Flexible(
+                    child: _roomSurface(height: figure < 72 ? 72 : figure)),
                 if (_ready && onOpenRoom != null && !compact) ...[
                   const SizedBox(height: 10),
                   OutlinedButton(
@@ -74,41 +83,59 @@ class CharacterStage extends StatelessWidget {
         },
       );
 
-  Widget _statusRow() => Row(children: [
-        Icon(Icons.circle, size: 8, color: _ready ? teal : muted),
-        const SizedBox(width: 8),
-        Expanded(
-            child: Text(_statusLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 13, color: ink))),
-        if (!motionEnabled)
-          const Tooltip(
-              message: 'Reduced motion is on',
-              child: Icon(Icons.motion_photos_off_outlined,
-                  size: 18, color: muted)),
-      ]);
-
-  Widget _roomSurface({required double height}) {
-    // The preview render carries its own dark backdrop. Rounding it frames the
-    // room the way the reference layout does instead of repainting the art.
-    final figure = ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Image.asset(
-        'assets/robert/Robert.png',
-        height: height,
-        fit: BoxFit.contain,
-        excludeFromSemantics: true,
-        errorBuilder: (context, error, stack) => SizedBox(
-            height: height,
-            child: const Center(
-                child: Icon(Icons.smart_toy_outlined, size: 96, color: teal))),
+  Widget _statusRow() {
+    final row = Row(children: [
+      Icon(Icons.circle, size: 8, color: _ready ? teal : muted),
+      const SizedBox(width: 8),
+      Flexible(
+          child: Text(_statusLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600, fontSize: 13, color: ink))),
+      if (!motionEnabled) ...[
+        const SizedBox(width: 6),
+        const Tooltip(
+            message: 'Reduced motion is on',
+            child:
+                Icon(Icons.motion_photos_off_outlined, size: 18, color: muted)),
+      ],
+    ]);
+    if (!surfaceAttached) return row;
+    // Over a live scene the label needs its own surface to stay legible.
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+            color: ivoryScrim, borderRadius: BorderRadius.circular(999)),
+        child: IntrinsicWidth(child: row),
       ),
     );
+  }
+
+  Widget _roomSurface({required double height}) {
+    // A live room draws itself behind this; painting anything here would cover
+    // it. The space is still reserved, and still tappable.
+    final figure = surfaceAttached
+        ? SizedBox(height: height, width: double.infinity)
+        : ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              'assets/robert/Robert.png',
+              height: height,
+              fit: BoxFit.contain,
+              excludeFromSemantics: true,
+              errorBuilder: (context, error, stack) => SizedBox(
+                  height: height,
+                  child: const Center(
+                      child: Icon(Icons.smart_toy_outlined,
+                          size: 96, color: teal))),
+            ),
+          );
     if (onTapCharacter == null) {
       return Semantics(
-        image: true,
+        image: !surfaceAttached,
         label: 'Robert, your orange and teal robot learning companion',
         child: figure,
       );

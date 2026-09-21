@@ -19,6 +19,9 @@ class FakeUnityHost {
   final String name;
   final Set<String> capabilities;
   final List<Map<String, dynamic>> sent = [];
+
+  /// Whether the host reports a composited room surface.
+  bool surfaceAttached = true;
   int openRoomCalls = 0;
   int disposeRoomCalls = 0;
   int _sequence = 0;
@@ -55,6 +58,8 @@ class FakeUnityHost {
         case 'disposeRoom':
           disposeRoomCalls++;
           return null;
+        case 'roomSurface':
+          return surfaceAttached;
         case 'sendMessage':
           final message =
               jsonDecode(call.arguments as String) as Map<String, dynamic>;

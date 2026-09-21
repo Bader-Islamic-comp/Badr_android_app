@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:companion_mobile/bridge/avatar_bridge.dart';
+import 'package:companion_mobile/bridge/avatar_room.dart';
 import 'package:companion_mobile/data/demo_api.dart';
 import 'package:companion_mobile/domain/companion_controller.dart';
 import 'package:companion_mobile/main.dart';
@@ -7,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+
+import 'fake_unity_host.dart';
 
 const _lessons = {
   'items': [
@@ -245,5 +249,56 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     model.dispose();
+  });
+
+  testWidgets('the page only paints transparently when a room is behind it',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    // No host at all: the page must stay opaque, or it would show through to
+    // an empty window instead of a character room.
+    await tester.pumpWidget(const CompanionApp());
+    await tester.pumpAndSettle();
+    expect(tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        isNot(Colors.transparent));
+    expect(find.text('Robert · static preview'), findsNothing,
+        reason: 'the handshake is still in flight at this point');
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+    expect(find.text('Robert · static preview'), findsOneWidget);
+
+    // A composited surface makes the page full bleed, and the static preview
+    // gives way to a transparent window onto the live room.
+    final host = FakeUnityHost('test/fullbleed')..install();
+    addTearDown(host.remove);
+    final room = AvatarRoom(
+      commands: host.commands,
+      // Generous: pumpAndSettle advances fake time in 100 ms steps, which
+      // would otherwise trip the deadline before the channel reply lands.
+      create: () => AvatarBridge(
+          commands: host.commands,
+          events: host.events,
+          timeout: const Duration(seconds: 30)),
+    );
+    addTearDown(room.dispose);
+    // Unmount first: pumping another CompanionApp would reuse the existing
+    // CompanionHome state, so initState would never run for this room.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(CompanionApp(room: room));
+    await tester.pumpAndSettle();
+    // The surface query is a platform round trip that runs alongside the
+    // handshake, so let it land without advancing the clock.
+    for (var flush = 0; flush < 6; flush++) {
+      await tester.pump();
+    }
+    expect(room.surfaceAttached, isTrue);
+    expect(tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        Colors.transparent);
+    expect(find.text('Robert · static preview'), findsNothing,
+        reason: 'the live room replaces the static card');
+    await tester.pumpWidget(const SizedBox());
   });
 }

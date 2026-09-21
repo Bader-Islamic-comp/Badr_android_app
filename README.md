@@ -45,6 +45,16 @@ Below roughly 240 logical pixels of page height the character room yields its
 space entirely — readable text and a reachable composer take priority over
 keeping Robert visible.
 
+The layout is **full bleed when, and only when, a room is composited behind
+Flutter**. `AvatarRoom.surfaceAttached` asks the host whether a surface exists,
+deliberately independent of the bridge handshake, and that alone decides whether
+the page paints. With a room the scaffold and the character stage are
+transparent so the live 3D shows through, and anything carrying text — header,
+development notice, status line, notices, composer and navigation — keeps its
+own scrim, because a 3D scene cannot be relied on for contrast. Without a room
+the page stays opaque ivory and the stage shows the static preview on its card;
+painting transparently with nothing behind it would show an empty window.
+
 ## Character boundary
 
 `AvatarBridge` uses `companion/unity_commands` (`sendMessage`, `openRoom`,

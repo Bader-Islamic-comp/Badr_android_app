@@ -124,6 +124,10 @@ class _CompanionHomeState extends State<CompanionHome>
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: Listenable.merge([model, room]),
         builder: (context, _) => Scaffold(
+          // Full bleed: with a room composited behind Flutter the page itself
+          // must not paint, or it hides the 3D. Without one it stays opaque,
+          // because transparency over nothing shows an empty window.
+          backgroundColor: room.surfaceAttached ? Colors.transparent : ivory,
           body: SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
@@ -134,7 +138,7 @@ class _CompanionHomeState extends State<CompanionHome>
                   Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: Column(children: [
-                        const DevelopmentBanner(),
+                        DevelopmentBanner(overRoom: room.surfaceAttached),
                         if (model.busy)
                           const Padding(
                               padding: EdgeInsets.only(top: 8),
@@ -145,10 +149,12 @@ class _CompanionHomeState extends State<CompanionHome>
                               padding: const EdgeInsets.only(top: 10),
                               child: Semantics(
                                   liveRegion: true,
-                                  child: Text(model.notice!,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14)))),
+                                  child: Scrim(
+                                      enabled: room.surfaceAttached,
+                                      child: Text(model.notice!,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14))))),
                       ])),
                   Expanded(child: _page()),
                   if (destination == CompanionDestination.talk) _composer(),
@@ -182,8 +188,11 @@ class _CompanionHomeState extends State<CompanionHome>
         ),
       );
 
-  Widget _header(BuildContext context) => Padding(
+  Widget _header(BuildContext context) => Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        // The header carries the app name, the balance and the parent entry, so
+        // it keeps its own surface over a live scene.
+        color: room.surfaceAttached ? ivoryScrim : Colors.transparent,
         child: Row(children: [
           Container(
             padding: const EdgeInsets.all(7),
@@ -216,6 +225,7 @@ class _CompanionHomeState extends State<CompanionHome>
         CompanionDestination.talk => TalkPage(
             model: model,
             room: room,
+            overRoom: room.surfaceAttached,
             onTapCharacter: () => _cue(AvatarReaction.wave),
             onStartOrientation: _startOrientation,
           ),
@@ -233,8 +243,9 @@ class _CompanionHomeState extends State<CompanionHome>
           ),
       };
 
-  Widget _composer() => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+  Widget _composer() => Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        color: room.surfaceAttached ? ivoryScrim : Colors.transparent,
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(
             child: TextField(

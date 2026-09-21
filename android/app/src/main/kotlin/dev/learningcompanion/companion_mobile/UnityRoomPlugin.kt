@@ -15,6 +15,8 @@ import io.flutter.plugin.common.MethodChannel
  * `companion/unity_commands` accepts three methods:
  *  - `sendMessage`: forwards one bridge v1 envelope verbatim into the Unity
  *    receiver's `ReceiveMessage`.
+ *  - `roomSurface`: reports whether a room surface is composited at all,
+ *    independently of the bridge handshake.
  *  - `openRoom`: reports whether a composited room exists.
  *  - `disposeRoom`: drops the bridge session so a later retry starts from clean
  *    sequence state on both sides.
@@ -79,6 +81,10 @@ internal class UnityRoomPlugin :
                 }
                 result.success(null)
             }
+            // Whether a surface is composited is a different question from
+            // whether the bridge has negotiated, and the UI needs the first one
+            // to decide whether it may paint transparently.
+            "roomSurface" -> result.success(player != null)
             "openRoom" -> result.success(player != null)
             "disposeRoom" -> {
                 // Unity permits one player per process and the activity owns it,

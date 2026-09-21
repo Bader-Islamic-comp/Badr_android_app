@@ -39,11 +39,16 @@ class AvatarRoom extends ChangeNotifier {
   bool _started = false;
   bool _recreating = false;
   bool _disposed = false;
+  bool _surfaceAttached = false;
   bool _onCharacterPage = false;
   bool _foreground = true;
   bool _motionEnabled = true;
 
   AvatarBridge get bridge => _bridge;
+
+  /// True when the host has a room surface composited behind Flutter. The UI
+  /// may only paint transparently while this holds.
+  bool get surfaceAttached => _surfaceAttached;
   AvatarStatus get status => _bridge.status;
   bool get recreating => _recreating;
   bool get motionEnabled => _motionEnabled;
@@ -64,6 +69,9 @@ class AvatarRoom extends ChangeNotifier {
     if (_started || _disposed) return;
     _started = true;
     _attempts = 1;
+    // Whether a surface is composited is a presentation detail. Asking must not
+    // delay the handshake, so it runs alongside it.
+    unawaited(_probeSurface());
     await _bridge.initialize();
   }
 
@@ -85,6 +93,7 @@ class AvatarRoom extends ChangeNotifier {
       if (_disposed) return;
       _bridge = _create();
       _bridge.addListener(_onBridgeChanged);
+      unawaited(_probeSurface());
       await _bridge.initialize();
       if (_disposed) return;
       await _bridge.setMotionEnabled(_motionEnabled);
@@ -94,6 +103,13 @@ class AvatarRoom extends ChangeNotifier {
       _recreating = false;
       if (!_disposed) notifyListeners();
     }
+  }
+
+  Future<void> _probeSurface() async {
+    final attached = await _bridge.probeSurface();
+    if (_disposed || attached == _surfaceAttached) return;
+    _surfaceAttached = attached;
+    notifyListeners();
   }
 
   Future<void> setOnCharacterPage(bool value) {
