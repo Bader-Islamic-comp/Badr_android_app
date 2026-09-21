@@ -266,6 +266,12 @@ namespace Companion.Presentation.Editor
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
             try
             {
+                // Unpack before wiring. Saved as a variant of the FBX, the
+                // added components' references to base objects serialize as
+                // bare local file IDs that do not exist in this asset, so they
+                // resolve to null at runtime while looking correct in YAML.
+                PrefabUtility.UnpackPrefabInstance(
+                    instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
                 Renderer faceRenderer = FindFaceRenderer(instance);
                 Material[] materials = faceRenderer.sharedMaterials;
                 materials[0] = faceMaterial;
@@ -277,6 +283,20 @@ namespace Companion.Presentation.Editor
 
                 RobertFacePlayer player = instance.AddComponent<RobertFacePlayer>();
                 ConfigureFacePlayer(player, faceRenderer, neutral);
+
+                // Prove the binding the skin controller will demand at runtime,
+                // so a broken face player fails the build instead of showing up
+                // as "wire a valid default skin" on a device.
+                if (!player.Rebind())
+                {
+                    throw new InvalidOperationException(
+                        "The face player could not bind to '" + FaceMesh + "'. Its material " +
+                        "must expose _BaseMap, _MainTex or _BaseColorTexture.");
+                }
+                if (!player.SetDefaultFace(neutral))
+                {
+                    throw new InvalidOperationException("The face player rejected the neutral face.");
+                }
 
                 string path = Generated + "/RobertSkin_default.prefab";
                 GameObject saved = PrefabUtility.SaveAsPrefabAsset(instance, path);

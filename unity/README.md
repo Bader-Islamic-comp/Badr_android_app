@@ -188,6 +188,20 @@ Commands are then held until the receiver proves it exists by emitting its first
 event. Delivering earlier targets a GameObject the scene has not created yet,
 and Unity drops that silently, with no error on either side.
 
+### Generated prefabs must be unpacked
+
+The room builder instantiates the imported model and then adds components to
+it. Saved directly, that produces a **variant of the FBX**, and the added
+components' references to base objects serialize as bare local file IDs which
+do not exist in the saved asset. The YAML looks correct — `faceRenderer:
+{fileID: ...}` is right there — but the reference resolves to null at runtime,
+and the only symptom is `RobertSkinController` logging "wire a valid default
+skin, visual root and face player" on device.
+
+The builder therefore unpacks the instance completely before wiring, and then
+calls `Rebind()` and `SetDefaultFace()` itself so a broken binding fails the
+build rather than the device.
+
 ## Open device questions
 
 These are unresolved and must be answered on a real Android device before the
