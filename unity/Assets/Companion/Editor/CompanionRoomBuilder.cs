@@ -95,6 +95,12 @@ namespace Companion.Presentation.Editor
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.X86_64;
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            // Unity 6 defaults to GameActivity, whose export ships only
+            // `UnityPlayerGameActivity` — an Activity to launch, with no
+            // embeddable `UnityPlayer` view. Unity-as-a-Library composition
+            // needs the classic Activity entry point, which exports
+            // `UnityPlayer` and `UnityPlayerActivity`.
+            PlayerSettings.Android.applicationEntry = AndroidApplicationEntry.Activity;
 
             EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
             EditorUserBuildSettings.exportAsGoogleAndroidProject = true;

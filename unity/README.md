@@ -75,6 +75,28 @@ The export targets **x86_64 only**, which is what the development emulator runs.
 A physical phone needs an ARM64 export, and a store build needs both plus its own
 signing; neither is configured.
 
+### Why the classic Activity entry point
+
+Unity 6 defaults its Android **Application Entry Point** to GameActivity. That
+export ships only `com.unity3d.player.UnityPlayerGameActivity` — an Activity you
+launch — and **no `UnityPlayer` class at all**. Unity-as-a-Library composition
+needs `UnityPlayer`, the embeddable player the host adds to its own view
+hierarchy, so a GameActivity export cannot be composited beneath Flutter no
+matter how the host is written.
+
+The exporter therefore sets
+`PlayerSettings.Android.applicationEntry = AndroidApplicationEntry.Activity`,
+which restores `UnityPlayer` and `UnityPlayerActivity`. If that setting is ever
+changed back, the host will find no player, report no room, and Flutter will
+fall back to the static avatar — silently, because that is also what a machine
+with no export at all looks like.
+
+Unity's exported manifest declares its own activity with a LAUNCHER
+intent-filter and sets `android:appCategory="game"`. Merged as-is that would give
+the app a second launcher icon and categorise a children's learning app as a
+game, so `../android/app/src/main/AndroidManifest.xml` strips both. Those rules
+are inert when no export is present.
+
 ### Why FBX and not the GLB
 
 The canonical runtime model is `Robert.glb`, but it is **not** what this project

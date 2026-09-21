@@ -69,8 +69,15 @@ internal class UnityRuntime private constructor(private val player: Any) {
          */
         fun createOrNull(activity: Activity): UnityRuntime? = try {
             val type = Class.forName(PLAYER)
-            val player = type.getConstructor(Activity::class.java).newInstance(activity)
-            UnityRuntime(player)
+            // The constructor's declared parameter has varied across Unity
+            // versions (Activity, Context, ContextWrapper), so match on what
+            // the export actually declares rather than assuming one shape.
+            val constructor = type.constructors.firstOrNull { candidate ->
+                candidate.parameterTypes.size == 1 &&
+                    candidate.parameterTypes[0].isAssignableFrom(activity.javaClass)
+            }
+            if (constructor == null) null
+            else UnityRuntime(constructor.newInstance(activity))
         } catch (error: ReflectiveOperationException) {
             null
         } catch (error: LinkageError) {

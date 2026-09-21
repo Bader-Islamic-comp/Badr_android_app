@@ -1,8 +1,27 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application
         android:label="companion_mobile"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:appCategory="productivity"
+        tools:replace="android:appCategory">
+
+        <!-- The exported Unity room declares its own launcher activity and
+             categorises the application as a game. This app has exactly one
+             entry point, MainActivity, and Unity is composited inside it rather
+             than launched on its own, so strip that launcher and keep a single
+             icon. Both rules are inert when no export is present. -->
+        <activity
+            android:name="com.unity3d.player.UnityPlayerActivity"
+            android:exported="false"
+            tools:node="merge"
+            tools:replace="android:exported">
+            <intent-filter tools:node="removeAll" />
+        </activity>
+        <activity
+            android:name="com.unity3d.player.UnityPlayerGameActivity"
+            tools:node="remove" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
