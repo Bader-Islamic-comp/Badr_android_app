@@ -109,23 +109,32 @@ No device or emulator is available, so none of this Kotlin has ever executed.
 without an exported `unityLibrary` module; in that state the bridge reports no
 room and Flutter keeps its static avatar.
 
-### Still not compiled
+### Unity: compiled and partly executed
 
-No Unity Editor is installed — only Unity Hub, whose editor list is empty — so
-these remain unbuilt:
+Unity 6000.3.24f1 with Android Build Support is now installed, so the whole kit
+compiles with no errors or warnings, and `unity/validation/Test-EditMode.ps1`
+runs 11 EditMode tests over `CompanionBridgeReceiver` in a real Editor.
 
-- `unity/Assets/Companion/Runtime/CompanionBridgeReceiver.cs`,
-  `RobertAvatarPresentation.cs` and `AndroidUnityEventTransport.cs`.
+Running them found a defect that compiling could not: all of the receiver's
+wiring happened in `Awake`, but Unity does not order `Awake` between components
+on one GameObject. `AndroidUnityEventTransport.Awake` calls `BindTransport`, so
+whenever the transport won that race the room would have refused the binding and
+silently never announced readiness. The receiver now resolves its session on
+first need instead.
+
+`RobertAvatarPresentation` and `AndroidUnityEventTransport` compile but have
+never executed: the first needs an imported model and a scene, the second an
+Android export and a device.
 
 ### Acceptance evidence, item by item
 
 1. Asset validation — **not run.** `assets/characters/robert/tools/verify_robert.py`
    exists and was not executed; no user asset was overwritten.
-2. Unity and Android host compile and 3D runtime loading — **partial.** The
-   Android host compiles into debug and release APKs. Unity compilation is
-   still blocked: no Editor is installed, so there is no export and no 3D
-   runtime has been loaded. No motion is applied to the static image in place
-   of the real runtime.
+2. Unity and Android host compile and 3D runtime loading — **partial.** Both
+   compile, and the receiver is exercised by EditMode tests. No 3D runtime has
+   been loaded: there is no glTF import, no scene and no Android export, so
+   nothing has rendered. No motion is applied to the static image in place of
+   the real runtime.
 3. Device idle/blink, one-shot return, pause and reduced motion — **blocked**
    for the device; the Flutter-side policy that drives them is tested.
 4. Timeout, missing assets, unsupported capability and process recreation —

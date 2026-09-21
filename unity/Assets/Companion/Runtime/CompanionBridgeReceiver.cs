@@ -39,9 +39,25 @@ namespace Companion.Presentation
 
         private void Awake()
         {
+            EnsureSession();
+        }
+
+        /// <summary>
+        /// Resolves the presentation and session on first need.
+        ///
+        /// Unity does not order `Awake` between components on one GameObject,
+        /// so the transport's `Awake` may call <see cref="BindTransport"/>
+        /// before this component's own `Awake` has run. Doing the wiring here
+        /// rather than only in `Awake` removes that race — otherwise the room
+        /// would silently never announce readiness.
+        /// </summary>
+        private bool EnsureSession()
+        {
+            if (session != null) return true;
             presentation = presentationBehaviour as IAvatarPresentation;
-            if (presentation == null) return;
+            if (presentation == null) return false;
             session = new BridgeSession(presentation);
+            return true;
         }
 
         /// <summary>
@@ -51,7 +67,7 @@ namespace Companion.Presentation
         /// </summary>
         public bool BindTransport(IUnityEventTransport value)
         {
-            if (value == null || session == null) return false;
+            if (value == null || !EnsureSession()) return false;
             transport = value;
             AnnounceReadiness();
             return true;
@@ -60,7 +76,7 @@ namespace Companion.Presentation
         /// <summary>Entry point for Unity native messaging. Never throws.</summary>
         public void ReceiveMessage(string envelope)
         {
-            if (session == null || transport == null || !transport.IsConnected) return;
+            if (!EnsureSession() || transport == null || !transport.IsConnected) return;
             BridgeResult result = session.Receive(envelope);
 
             // Structurally valid state-changing requests are answered; anything

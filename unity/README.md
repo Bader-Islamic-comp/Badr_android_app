@@ -1,38 +1,58 @@
 # Robert presentation integration kit
 
-An importable kit, not an Editor-created or compiled Unity project. No
-`ProjectSettings/`, scene YAML or platform export is fabricated here. Unity Hub
-is installed on the development machine, but **no Unity Editor is installed** —
-the Hub's editor list is empty and the only `unity.exe` files present are the
-Hub's own CLI and licensing shims. Unity compilation, rendering and EditMode
-tests therefore remain **unverified**.
+An importable kit, not an Editor-created Unity project: no `ProjectSettings/`,
+scene YAML or platform export is fabricated here. The scripts are nonetheless
+compiled and exercised in a real Editor by `validation/Test-EditMode.ps1`, which
+builds a throwaway project outside the repository.
 
-The Android toolchain is now present (SDK 36, build-tools 36.0.0, JetBrains
-Runtime 25 from Android Studio), so the Kotlin host compiles. No device or
-emulator is available, so nothing has been **run**.
+Verified with Unity 6000.3.24f1 (Android Build Support, bundled OpenJDK/SDK/NDK)
+and the Android toolchain (SDK 36, build-tools 36.0.0, JetBrains Runtime 25).
+**No glTF model is imported, no scene is built and no Android export is
+produced**, so rendering, the Unity-as-a-Library composition and every device
+measurement remain unverified. No device or emulator is available.
 
 ## What is and is not verified
 
 | Source | State |
 |---|---|
-| `Assets/Companion/Runtime/BridgeCommand.cs` | **Compiled and exercised** — 34 checks, see below |
-| `Assets/Companion/Runtime/BridgeSession.cs` | **Compiled and exercised** — 34 checks, see below |
-| `Assets/Companion/Runtime/CompanionBridgeReceiver.cs` | Uncompiled — needs `UnityEngine` |
-| `Assets/Companion/Runtime/RobertAvatarPresentation.cs` | Uncompiled — needs `UnityEngine` |
-| `Assets/Companion/Runtime/AndroidUnityEventTransport.cs` | Uncompiled — needs `UnityEngine` |
-| `../android/.../UnityRoomPlugin.kt`, `UnityRuntime.kt`, `MainActivity.kt` | **Compiles** into debug and release APKs; never executed |
+| `Assets/Companion/Runtime/BridgeCommand.cs` | Compiles; **executed** by 34 engine-free checks and the EditMode suite |
+| `Assets/Companion/Runtime/BridgeSession.cs` | Compiles; **executed** by 34 engine-free checks and the EditMode suite |
+| `Assets/Companion/Runtime/CompanionBridgeReceiver.cs` | Compiles; **executed** by 11 EditMode tests |
+| `Assets/Companion/Runtime/RobertAvatarPresentation.cs` | Compiles; never executed — needs an imported model and scene |
+| `Assets/Companion/Runtime/AndroidUnityEventTransport.cs` | Compiles; never executed — needs an Android export and a device |
+| `../android/.../UnityRoomPlugin.kt`, `UnityRuntime.kt`, `MainActivity.kt` | Compiles into debug and release APKs; never executed |
 
 `BridgeCommand` and `BridgeSession` are deliberately free of engine and
 third-party dependencies, including the JSON reader, so the part of the contract
-that decides what may touch presentation can be compiled and run without Unity:
+that decides what may touch presentation can be compiled and run without Unity
+at all:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File validation/Test-BridgeCore.ps1
 ```
 
-This is not a substitute for Unity assembly compilation, EditMode execution,
-importer verification, scene inspection or Android device tests. The kit
-intentionally leaves those gates open.
+The receiver needs the engine. This builds a throwaway project, stages the kit
+and the canonical character helpers, and runs the EditMode suite in batch mode:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File validation/Test-EditMode.ps1
+```
+
+Pass `-Fresh` to discard the throwaway project first, or `-UnityPath` to pick an
+Editor. The first run takes several minutes while Unity creates and imports the
+project.
+
+The EditMode suite covers what only the engine can: component wiring, transport
+binding and the exact envelopes Flutter has to validate — readiness reporting
+installed and then negotiated capabilities, acknowledgements naming the message
+they answer, malformed envelopes producing no reply at all, best-effort cues
+going unacknowledged, refused equipment answering with its reason, missing
+assets reporting `asset.failed`, nothing being accepted without a connected
+transport, and outgoing sequences increasing with unique message IDs.
+
+Neither suite is a substitute for importer verification, scene inspection,
+rendering checks or Android device tests. The kit intentionally leaves those
+gates open.
 
 ## Import and create the room
 
@@ -109,6 +129,8 @@ character room is treated as a capability rather than a prototype:
   not been approved yet.
 - Crash and lifecycle behaviour across background, rotation and process death.
 - Whether the reflective names in `UnityRuntime.kt` match the actual export.
+- Whether the glTF importer produces the four required clips on the imported
+  root, and whether the face material renders correctly in the chosen pipeline.
 - Whether `CompanionEventBridge` survives release shrinking in the final app.
   R8 renames it by default, which breaks the Unity-to-Flutter event path in
   release builds only; `android/app/proguard-rules.pro` keeps it, and that rule

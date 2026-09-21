@@ -116,8 +116,10 @@ iOS platform builds require macOS and Xcode and have not been run. The included
 web target provides an offline development preview
 (`flutter build web --no-web-resources-cdn`); web API testing requires explicit
 backend CORS configuration, which is currently disabled. A live character room is
-still unavailable in every wrapper: no Unity Editor is installed, so no
-`unityLibrary` export exists and `UnityRuntime` finds no player to create.
+still unavailable in every wrapper: no `unityLibrary` export has been produced,
+so `UnityRuntime` finds no player to create and the app shows the static
+avatar. Producing one needs a glTF importer, a room scene and a Unity Android
+export, none of which exist yet.
 
 The default run performs no backend requests. It supports a local orientation,
 labels local completion accurately and never invents a reward balance. The parent
@@ -170,8 +172,11 @@ buttons missing from the accessibility tree. They are now exposed as buttons
 with labels, hints and tap actions, asserted in the widget tests and confirmed
 again in the browser accessibility tree.
 
-The Unity bridge core is compiled and exercised separately; see
-[`unity/README.md`](unity/README.md).
+The Unity kit is compiled and exercised separately in a real Editor: 34
+engine-free checks over the bridge decision core plus 11 EditMode tests over the
+receiver. See [`unity/README.md`](unity/README.md). No scene, imported model or
+Android export exists yet, so the character room has never rendered and the
+Unity-as-a-Library composition is still unproven.
 
 Remaining gates include native host integration and device validation, real
 guardian identity and consent, secure token storage, persisted server state,

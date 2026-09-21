@@ -59,4 +59,4 @@ Check (!$narrow.Receive((Envelope 'avatar.play' @{animation='Dance'} 2)).Accepte
 Check (!$narrow.Receive((Envelope 'avatar.initialize' @{characterId='someone-else'; capabilities=@()} 2)).Accepted) 'Reject a foreign character'
 Check ($narrow.Receive((Envelope 'app.pause' @{} 2)).Accepted) 'Rejections left the sequence available'
 
-Write-Output 'Bridge core checks passed. Unity compilation and EditMode execution remain unverified.'
+Write-Output 'Bridge core checks passed. This is the engine-free core only; run Test-EditMode.ps1 for the receiver, and neither covers rendering, the Android export or a device.'
