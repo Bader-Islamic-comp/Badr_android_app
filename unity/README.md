@@ -91,6 +91,14 @@ changed back, the host will find no player, report no room, and Flutter will
 fall back to the static avatar — silently, because that is also what a machine
 with no export at all looks like.
 
+Switching the entry point is necessary but not sufficient. In Unity 6
+`UnityPlayer` itself is **abstract**: its only constructor is protected and
+takes an obfuscated internal type, and `getView()` is abstract. The concrete
+Activity-hosted player is `com.unity3d.player.UnityPlayerForActivityOrService`,
+which does expose a public `(Context)` constructor and `getView()`.
+`UnityRuntime` tries that first and falls back to `UnityPlayer` for older
+exports, skipping any candidate that turns out to be abstract.
+
 Unity's exported manifest declares its own activity with a LAUNCHER
 intent-filter and sets `android:appCategory="game"`. Merged as-is that would give
 the app a second launcher icon and categorise a children's learning app as a
@@ -153,6 +161,17 @@ watermark untouched so the sender can reuse that sequence.
 
 No credentials, networking, conversation state, rewards, persistence, text or
 audio belongs in this assembly.
+
+### Preparing the room before the handshake
+
+The receiver binds its transport in `Awake`, which only runs once Unity is
+actually playing the scene. So the host creates the player, attaches its surface
+and resumes it during preparation, **not** in `openRoom` — `openRoom` is only
+offered after a successful handshake, so waiting for it would deadlock.
+
+Commands are then held until the receiver proves it exists by emitting its first
+event. Delivering earlier targets a GameObject the scene has not created yet,
+and Unity drops that silently, with no error on either side.
 
 ## Open device questions
 

@@ -16,21 +16,21 @@ import io.flutter.plugin.common.MethodChannel
  * `companion/unity_commands` accepts three methods:
  *  - `sendMessage`: forwards one bridge v1 envelope verbatim into the Unity
  *    receiver's `ReceiveMessage`.
- *  - `openRoom`: composites the full-screen Unity surface beneath Flutter.
- *    Available only after a successful handshake.
+ *  - `openRoom`: ensures the full-screen Unity surface is composited beneath
+ *    Flutter and running. Idempotent; [prepare] already attached it.
  *  - `disposeRoom`: destroys runtime and receiver together so a later retry
  *    starts from a clean sequence state on both sides.
  *
  * `companion/unity_events` streams the receiver's sanitized events back.
  *
- * The runtime is prepared and its transport bound *before* `avatar.initialize`
- * is delivered; commands that arrive earlier are queued rather than dropped,
- * because the receiver must not see a command before its Awake has run.
+ * The runtime is created, attached and started before `avatar.initialize` is
+ * delivered, and commands are held until the receiver signals that it bound its
+ * transport. The receiver must not see a command before its Awake has run,
+ * because Unity drops a message to a GameObject that does not exist yet without
+ * any error.
  *
  * Nothing here logs an envelope. Payloads are presentation-only by contract,
  * but a log sink is not a place to find that out.
- *
- * NOT COMPILED OR RUN: no JDK or Android SDK was available in this environment.
  */
 internal class UnityRoomPlugin(private val activity: Activity) :
     MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
@@ -43,7 +43,7 @@ internal class UnityRoomPlugin(private val activity: Activity) :
     private var sink: EventChannel.EventSink? = null
     private var runtime: UnityRuntime? = null
     private var container: FrameLayout? = null
-    private var prepared = false
+    private var receiverBound = false
 
     fun attach(messenger: BinaryMessenger) {
         commands = MethodChannel(messenger, COMMANDS).apply { setMethodCallHandler(this@UnityRoomPlugin) }
@@ -100,29 +100,35 @@ internal class UnityRoomPlugin(private val activity: Activity) :
     }
 
     /**
-     * Creates the runtime and lets the receiver finish its own initialization
-     * before any command reaches it. Commands that arrive during preparation
-     * wait in [queued] instead of being delivered to a receiver that has not
-     * bound its transport yet.
+     * Creates the runtime, attaches its surface and starts it.
+     *
+     * Attaching and resuming here rather than in [openRoom] is what makes the
+     * handshake possible at all: the receiver binds its transport in `Awake`,
+     * which only runs once Unity is actually playing the scene. Waiting for
+     * `openRoom` would deadlock, because `openRoom` is itself only offered
+     * after a successful handshake.
      */
     private fun prepare() {
-        if (prepared || runtime != null) return
+        if (runtime != null) return
         val created = UnityRuntime.createOrNull(activity) ?: return
         runtime = created
-        // The receiver binds its transport in Awake, which Unity runs on its own
-        // player loop. Drain on the next main-thread turn so the first envelope
-        // cannot outrun it.
-        main.post {
-            prepared = true
-            while (queued.isNotEmpty()) {
-                created.send(RECEIVER, METHOD, queued.removeFirst())
-            }
+        if (!attachSurface(created)) {
+            // A room that cannot be composited is a missing room, not a reason
+            // to lose the lesson. Drop it and let Flutter keep static Robert.
+            teardown()
+            return
         }
+        created.resume()
     }
 
+    /**
+     * Commands wait until the receiver has actually bound its transport, which
+     * it signals by emitting its first event. Delivering earlier would target a
+     * GameObject the scene has not created yet, and Unity drops that silently.
+     */
     private fun deliver(envelope: String): Boolean {
         val active = runtime ?: return false
-        if (!prepared) {
+        if (!receiverBound) {
             if (queued.size >= MAX_QUEUED) return false
             queued.addLast(envelope)
             return true
@@ -135,28 +141,56 @@ internal class UnityRoomPlugin(private val activity: Activity) :
         }
     }
 
+    private fun drainQueued() {
+        val active = runtime ?: return
+        while (queued.isNotEmpty()) {
+            try {
+                active.send(RECEIVER, METHOD, queued.removeFirst())
+            } catch (error: ReflectiveOperationException) {
+                return
+            }
+        }
+    }
+
     /**
-     * Composites Unity full screen beneath the Flutter view. Flutter keeps every
-     * interactive control above it, so input routing, transparency, keyboard
-     * insets and accessibility all have to be proven on a real device before
-     * this is treated as working.
+     * Composites Unity full screen beneath the Flutter view. Index 0 keeps the
+     * Flutter view, and therefore every control, on top.
      */
-    private fun openRoom(): Boolean {
-        val active = runtime ?: return false
+    private fun attachSurface(active: UnityRuntime): Boolean {
         if (container != null) return true
         val surface = active.view ?: return false
         val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return false
-        val holder = FrameLayout(activity)
-        holder.addView(
-            surface,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
+        return try {
+            // Unity 6 hands back a view that is already inside the player's own
+            // layout, so it has to be detached before it can be re-parented.
+            (surface.parent as? ViewGroup)?.removeView(surface)
+            val holder = FrameLayout(activity)
+            holder.addView(
+                surface,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
             )
-        )
-        // Index 0 keeps the Flutter view, and therefore every control, on top.
-        content.addView(holder, 0)
-        container = holder
+            content.addView(holder, 0)
+            container = holder
+            true
+        } catch (error: RuntimeException) {
+            // Never let a compositing failure reach the activity: this app must
+            // survive a broken room with its static avatar intact.
+            container = null
+            false
+        }
+    }
+
+    /**
+     * Idempotent: the surface is already attached by [prepare]. Input routing,
+     * transparency, keyboard insets and accessibility over this composition all
+     * still have to be proven on a real device.
+     */
+    private fun openRoom(): Boolean {
+        val active = runtime ?: return false
+        if (!attachSurface(active)) return false
         active.resume()
         return true
     }
@@ -168,7 +202,7 @@ internal class UnityRoomPlugin(private val activity: Activity) :
      */
     private fun teardown() {
         queued.clear()
-        prepared = false
+        receiverBound = false
         container?.let { holder ->
             (holder.parent as? ViewGroup)?.removeView(holder)
             holder.removeAllViews()
@@ -180,7 +214,15 @@ internal class UnityRoomPlugin(private val activity: Activity) :
 
     private fun emit(json: String) {
         if (json.length > MAX_EVENT) return
-        main.post { sink?.success(json) }
+        main.post {
+            // The first event out of Unity proves the receiver exists and has
+            // bound its transport, so anything held back can go now.
+            if (!receiverBound) {
+                receiverBound = true
+                drainQueued()
+            }
+            sink?.success(json)
+        }
     }
 
     companion object {

@@ -16,9 +16,8 @@ import android.view.View
  * memory footprint after unloading, so the host creates at most one and
  * recreates it only together with a fresh receiver.
  *
- * NOT COMPILED OR RUN. No Unity Editor, Android SDK or JDK was available. Every
- * reflective name below has to be confirmed against the actual export, and the
- * composition has to be validated on a device before this is relied upon.
+ * The reflective names are confirmed against a Unity 6000.3 export. The
+ * composition itself still has to be validated on a real device.
  */
 internal class UnityRuntime private constructor(private val player: Any) {
 
@@ -50,17 +49,34 @@ internal class UnityRuntime private constructor(private val player: Any) {
     }
 
     companion object {
-        private const val PLAYER = "com.unity3d.player.UnityPlayer"
+        /**
+         * Candidate player classes, most recent first.
+         *
+         * Unity 6 made `UnityPlayer` abstract — its only constructor is
+         * protected and takes an obfuscated internal type, and `getView()` is
+         * abstract — and moved the concrete Activity-hosted player to
+         * `UnityPlayerForActivityOrService`. Older exports only have
+         * `UnityPlayer`, so both are tried.
+         */
+        private val PLAYERS = listOf(
+            "com.unity3d.player.UnityPlayerForActivityOrService",
+            "com.unity3d.player.UnityPlayer"
+        )
 
         private fun playerClass(player: Any): Class<*> = player.javaClass
 
-        /** True when an exported Unity runtime is present in this build. */
-        fun isAvailable(): Boolean = try {
-            Class.forName(PLAYER)
-            true
-        } catch (error: ClassNotFoundException) {
-            false
+        private fun resolve(): Class<*>? = PLAYERS.firstNotNullOfOrNull { name ->
+            try {
+                val type = Class.forName(name)
+                // An abstract base is not something this host can instantiate.
+                if (java.lang.reflect.Modifier.isAbstract(type.modifiers)) null else type
+            } catch (error: ClassNotFoundException) {
+                null
+            }
         }
+
+        /** True when an instantiable Unity runtime is present in this build. */
+        fun isAvailable(): Boolean = resolve() != null
 
         /**
          * Creates the runtime, or returns null when the export is absent or the
@@ -68,11 +84,11 @@ internal class UnityRuntime private constructor(private val player: Any) {
          * room rather than crashing the learning experience.
          */
         fun createOrNull(activity: Activity): UnityRuntime? = try {
-            val type = Class.forName(PLAYER)
+            val type = resolve()
             // The constructor's declared parameter has varied across Unity
             // versions (Activity, Context, ContextWrapper), so match on what
             // the export actually declares rather than assuming one shape.
-            val constructor = type.constructors.firstOrNull { candidate ->
+            val constructor = type?.constructors?.firstOrNull { candidate ->
                 candidate.parameterTypes.size == 1 &&
                     candidate.parameterTypes[0].isAssignableFrom(activity.javaClass)
             }
