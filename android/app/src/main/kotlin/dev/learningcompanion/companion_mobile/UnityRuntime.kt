@@ -73,6 +73,10 @@ internal class UnityRuntime private constructor(private val player: Any) {
             UnityRuntime(player)
         } catch (error: ReflectiveOperationException) {
             null
+        } catch (error: LinkageError) {
+            // An export whose native library will not load is a missing room,
+            // not a crash: the child keeps the static avatar and the lesson.
+            null
         }
     }
 }

@@ -11,8 +11,8 @@ device measurement therefore remain **unverified**.
 
 | Source | State |
 |---|---|
-| `Assets/Companion/Runtime/BridgeCommand.cs` | **Compiled and exercised** — 35 checks, see below |
-| `Assets/Companion/Runtime/BridgeSession.cs` | **Compiled and exercised** — 35 checks, see below |
+| `Assets/Companion/Runtime/BridgeCommand.cs` | **Compiled and exercised** — 34 checks, see below |
+| `Assets/Companion/Runtime/BridgeSession.cs` | **Compiled and exercised** — 34 checks, see below |
 | `Assets/Companion/Runtime/CompanionBridgeReceiver.cs` | Uncompiled — needs `UnityEngine` |
 | `Assets/Companion/Runtime/RobertAvatarPresentation.cs` | Uncompiled — needs `UnityEngine` |
 | `Assets/Companion/Runtime/AndroidUnityEventTransport.cs` | Uncompiled — needs `UnityEngine` |

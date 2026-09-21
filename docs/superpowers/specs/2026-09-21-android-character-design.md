@@ -89,7 +89,7 @@ Recorded 2026-09-21. This records what exists, not what is approved.
   and confirmed both in widget semantics assertions and in the browser
   accessibility tree.
 - `BridgeCommand` and `BridgeSession`, the Unity receiver's decision core,
-  written dependency-free and exercised by 35 compiled checks.
+  written dependency-free and exercised by 34 compiled checks.
 
 ### Written but not compiled or run
 

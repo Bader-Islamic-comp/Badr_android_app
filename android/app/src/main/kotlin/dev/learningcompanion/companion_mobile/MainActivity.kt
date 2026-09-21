@@ -1,6 +1,7 @@
 package dev.learningcompanion.companion_mobile
 
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterActivityLaunchConfigs.BackgroundMode
 import io.flutter.embedding.engine.FlutterEngine
 
 /**
