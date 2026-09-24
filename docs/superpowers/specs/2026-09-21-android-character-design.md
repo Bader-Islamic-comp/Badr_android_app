@@ -64,16 +64,33 @@ Review this design before creating the implementation plan. The plan will separa
 
 ## Implementation status
 
-Recorded 2026-09-21. This records what exists, not what is approved.
+First recorded 2026-09-21, updated 2026-09-22. This records what exists, not
+what is approved. `comp-mobile/CHANGELOG.md` has the increment-by-increment log.
 
 ### Implemented and verified in this environment
 
-- The character-first main page: compact header, central character room,
-  greeting/validated reply surface, bottom composer and compact navigation,
-  in the existing ivory/teal/orange palette. Balances render only from server
-  state; the parent entry and honest connection state are preserved.
+- The character-first shell in the existing ivory/teal/orange palette: a
+  character page, a bottom composer and compact navigation, with the header,
+  the balance, the parent entry and honest connection state on the other three
+  pages. Balances render only from server state.
 - The stage surrenders its height before readability does, and disappears
-  entirely below roughly 240 logical pixels of page height.
+  entirely below roughly 260 logical pixels of page height.
+- The character page reduced to the character, its last reply and the composer.
+  With no reply the page is only Robert. Earlier answers are not kept; the
+  orientation prompt moved to Learn, the service connection to Quests, Style and
+  the parent area, and the room's status and retry to the parent area. The app
+  header and the adult-operator notice are off this page and on the other three,
+  so the balance, the parent entry and the notice stay one tap away. Clearing
+  stays beside the reply because it deletes the server conversation.
+- The character appears on the character page only. The other pages are backed
+  by the room's own backdrop image without him, so they read as the same place
+  and look identical with or without a Unity room.
+- A customization tab: the service publishes a four-look catalogue with prices,
+  spends stars from its own append-only ledger, and records what is owned and
+  worn. Flutter offers a look only against the balance the service reported, and
+  sends `avatar.set_cosmetics` from the service's own record of what is worn,
+  never from the tap — so earning alone tells the room nothing, and a relaunch
+  or a room rebuild restores the worn look without one.
 - Presentation policy in `AvatarBridge`: pause when backgrounded, off the
   character page or motion is disabled; a greeting wave once per initialized
   room; a bounded, spaced reaction queue that is discarded rather than replayed
@@ -89,12 +106,12 @@ Recorded 2026-09-21. This records what exists, not what is approved.
   and confirmed both in widget semantics assertions and in the browser
   accessibility tree.
 - `BridgeCommand` and `BridgeSession`, the Unity receiver's decision core,
-  written dependency-free and exercised by 34 compiled checks.
+  written dependency-free and exercised by 36 compiled checks.
 
-### Compiled, but never executed
+### The Android host
 
-An Android SDK and the JetBrains Runtime from Android Studio are now installed,
-so `android/app/src/main/kotlin/.../UnityRoomPlugin.kt`, `UnityRuntime.kt` and
+An Android SDK and the JetBrains Runtime from Android Studio are installed, so
+`android/app/src/main/kotlin/.../UnityRoomPlugin.kt`, `UnityRuntime.kt` and
 `MainActivity.kt` **compile** and land in both a debug and a release APK.
 Compiling confirmed the `FlutterActivityLaunchConfigs.BackgroundMode` import and
 the override signatures, and the release build exposed a defect that a debug
@@ -103,7 +120,9 @@ by name over JNI, so the Unity-to-Flutter event path would have failed in
 release only. `android/app/proguard-rules.pro` now keeps it, verified by
 inspecting the release DEX.
 
-No device or emulator is available, so none of this Kotlin has ever executed.
+This Kotlin now runs: on an Android 16 x86_64 emulator the app installs,
+launches, creates the player in-process and composites Unity's surface full
+screen beneath a transparent Flutter view. No physical device has been used.
 
 `UnityRuntime` reaches the player reflectively, so the app builds and runs
 without an exported `unityLibrary` module; in that state the bridge reports no
@@ -113,7 +132,7 @@ room and Flutter keeps its static avatar.
 
 Unity 6000.3.24f1 with Android Build Support is now installed, so the whole kit
 compiles with no errors or warnings, and `unity/validation/Test-EditMode.ps1`
-runs 11 EditMode tests over `CompanionBridgeReceiver` in a real Editor.
+runs 12 EditMode tests over `CompanionBridgeReceiver` in a real Editor.
 
 Running them found a defect that compiling could not: all of the receiver's
 wiring happened in `Awake`, but Unity does not order `Awake` between components
@@ -146,12 +165,16 @@ exists, feeding it the `unity.*` properties from the export's own
 1. Asset validation — **not run.** `assets/characters/robert/tools/verify_robert.py`
    exists and was not executed; no user asset was overwritten.
 2. Unity and Android host compile and 3D runtime loading — **partial.** Both
-   compile, and the receiver is exercised by EditMode tests. No 3D runtime has
-   been loaded: there is no glTF import, no scene and no Android export, so
-   nothing has rendered. No motion is applied to the static image in place of
-   the real runtime.
-3. Device idle/blink, one-shot return, pause and reduced motion — **blocked**
-   for the device; the Flutter-side policy that drives them is tested.
+   compile, the receiver is exercised by EditMode tests, and on an x86_64
+   emulator the runtime loads, the room renders — the Blender-sourced model, its
+   rig, the neutral face and a desert backdrop, composited beneath the Flutter
+   page — and the bridge handshake completes, with an earned look delivered over
+   it recolouring the character. No motion is applied to the static image in
+   place of the real runtime.
+3. Device idle/blink, one-shot return, pause and reduced motion — **partial.**
+   The greeting wave runs on the device; blink timing, one-shot return, pause
+   and reduced motion have not been measured there. The Flutter-side policy that
+   drives them is tested.
 4. Timeout, missing assets, unsupported capability and process recreation —
    **covered in Flutter tests**; static fallback preserves chat and navigation.
    The native half of recreation is unverified.
@@ -163,6 +186,14 @@ exists, feeding it the `unity.*` properties from the export's own
    buttons are now in the accessibility tree. TalkBack, real keyboard insets and
    rotation need a device.
 7. Startup, memory, frame time and package size — **partial.** The release APK
-   is 49.3 MB without a Unity export; startup, memory and frame time need a
-   device, and no budgets have been approved to measure against. No
-   low-end-device performance claim is made.
+   is 49.3 MB without a Unity export; the debug APK with the x86_64 export is
+   125 MB, which is a debug, single-ABI number and not a shipping size. Startup,
+   memory and frame time still need a physical device, and no budgets have been
+   approved to measure against. No low-end-device performance claim is made.
+
+8. Cosmetics — **implemented, tested and seen on a device.** The catalogue,
+   pricing, ledger spend, ownership and equipment are server-authoritative and
+   covered by server and Flutter tests, including that the room is told only
+   after the service confirms. On the emulator the whole loop runs: complete the
+   orientation, earn Sunset Copper for five stars, wear it, and the character
+   recolours. A look is a colourway until modelled garments are authored.

@@ -51,7 +51,9 @@ void main() {
   });
 
   test('missing native host fails closed to static preview', () async {
-    final bridge = AvatarBridge(timeout: const Duration(milliseconds: 20));
+    final bridge = AvatarBridge(
+        timeout: const Duration(milliseconds: 20),
+        startupTimeout: const Duration(milliseconds: 20));
     await bridge.initialize();
     expect(bridge.status, AvatarStatus.staticPreview);
     expect(await bridge.openRoom(), isFalse);
@@ -71,7 +73,8 @@ void main() {
     final bridge = AvatarBridge(
         commands: commands,
         events: events,
-        timeout: const Duration(milliseconds: 10));
+        timeout: const Duration(milliseconds: 10),
+        startupTimeout: const Duration(milliseconds: 10));
     await bridge.initialize();
     expect(bridge.status, AvatarStatus.staticPreview);
     bridge.dispose();
@@ -119,12 +122,13 @@ void main() {
     final bridge = AvatarBridge(
         commands: commands,
         events: events,
-        timeout: const Duration(milliseconds: 20));
+        timeout: const Duration(milliseconds: 20),
+        startupTimeout: const Duration(milliseconds: 20));
     await bridge.initialize();
     expect(bridge.status, AvatarStatus.ready);
     expect(await bridge.wave(), isFalse);
     expect(sent.length, 1);
-    expect(await bridge.applyServerConfirmedDefault(), isFalse);
+    expect(await bridge.applyServerConfirmedCosmetic('default'), isFalse);
     expect(bridge.status, AvatarStatus.staticPreview);
     expect(sent.last['payload'], {'cosmeticId': 'default'});
     bridge.dispose();
@@ -222,7 +226,8 @@ void main() {
     final bridge = AvatarBridge(
         commands: commands,
         events: const EventChannel(eventName),
-        timeout: const Duration(milliseconds: 20));
+        timeout: const Duration(milliseconds: 20),
+        startupTimeout: const Duration(milliseconds: 20));
     await bridge.initialize();
     expect(bridge.status, AvatarStatus.staticPreview);
     bridge.dispose();

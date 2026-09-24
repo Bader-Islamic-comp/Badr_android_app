@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../bridge/avatar_bridge.dart';
@@ -40,6 +42,11 @@ class _CompanionHomeState extends State<CompanionHome>
   bool platformReducedMotion = false;
 
   bool get motionEnabled => motionOverride ?? !platformReducedMotion;
+  bool get onCharacterPage => destination == CompanionDestination.talk;
+
+  /// The look this room session has been told about, so a look is pushed once
+  /// per room rather than on every notification.
+  String? appliedCosmetic;
 
   @override
   void initState() {
@@ -47,8 +54,26 @@ class _CompanionHomeState extends State<CompanionHome>
     model = widget.controller ??
         CompanionController(DemoApi(DemoConfig.environment()));
     room = widget.room ?? AvatarRoom();
+    // The room follows the service's record of what is worn, not the tap that
+    // changed it: that is also what restores the look after a relaunch or a
+    // room rebuild, neither of which involves a tap.
+    model.addListener(_syncCosmetic);
+    room.addListener(_syncCosmetic);
     WidgetsBinding.instance.addObserver(this);
     _startRoom();
+  }
+
+  void _syncCosmetic() {
+    if (room.status != AvatarStatus.ready) {
+      // A rebuilt room installs its default look, so the next ready room has
+      // to be told again.
+      appliedCosmetic = null;
+      return;
+    }
+    final equipped = model.equippedCosmeticId;
+    if (equipped == null || equipped == appliedCosmetic) return;
+    appliedCosmetic = equipped;
+    unawaited(room.applyServerConfirmedCosmetic(equipped));
   }
 
   Future<void> _startRoom() async {
@@ -75,6 +100,8 @@ class _CompanionHomeState extends State<CompanionHome>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    model.removeListener(_syncCosmetic);
+    room.removeListener(_syncCosmetic);
     question.dispose();
     if (widget.controller == null) model.dispose();
     if (widget.room == null) room.dispose();
@@ -93,14 +120,6 @@ class _CompanionHomeState extends State<CompanionHome>
 
   /// Local deterministic presentation cue. Never a model-generated command.
   void _cue(AvatarReaction reaction) => room.react(reaction);
-
-  Future<void> _startOrientation() async {
-    setState(() {
-      destination = CompanionDestination.learn;
-      lessonStep = 0;
-    });
-    await room.setOnCharacterPage(false);
-  }
 
   Future<void> _finishOrientation() async {
     final celebrated = await model.completeOrientation();
@@ -128,17 +147,26 @@ class _CompanionHomeState extends State<CompanionHome>
           // must not paint, or it hides the 3D. Without one it stays opaque,
           // because transparency over nothing shows an empty window.
           backgroundColor: room.surfaceAttached ? Colors.transparent : ivory,
-          body: SafeArea(
+          // Off the character page the backdrop covers the whole window, not
+          // just the content: the header strip and the notch area would
+          // otherwise still be a window onto the live room, with Robert
+          // showing through beside the title.
+          body: _backdrop(
+              child: SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: Column(children: [
-                  _header(context),
+                  // The character page is the character's: no title bar and no
+                  // banner over him. Both stay on every other page, so the
+                  // parent entry, the balance and the adult-operator notice are
+                  // one tap away and are not lost.
+                  if (!onCharacterPage) _header(context),
                   Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: Column(children: [
-                        DevelopmentBanner(overRoom: room.surfaceAttached),
+                        if (!onCharacterPage) const DevelopmentBanner(),
                         if (model.busy)
                           const Padding(
                               padding: EdgeInsets.only(top: 8),
@@ -157,11 +185,11 @@ class _CompanionHomeState extends State<CompanionHome>
                                               fontSize: 14))))),
                       ])),
                   Expanded(child: _page()),
-                  if (destination == CompanionDestination.talk) _composer(),
+                  if (onCharacterPage) _composer(),
                 ]),
               ),
             ),
-          ),
+          )),
           bottomNavigationBar: NavigationBar(
             selectedIndex: destination.index,
             onDestinationSelected: (value) =>
@@ -187,6 +215,23 @@ class _CompanionHomeState extends State<CompanionHome>
           ),
         ),
       );
+
+  /// Robert lives in the room, and the room is the character page. Every other
+  /// page shows the same place without him — the backdrop's own picture, the
+  /// one the Unity room renders, veiled so a headline stays readable over it.
+  /// It also makes those pages look the same whether or not a room is running.
+  Widget _backdrop({required Widget child}) {
+    if (onCharacterPage) return child;
+    return Container(
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/room/backdrop_desert.png'),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Container(color: backdropVeil, child: child),
+    );
+  }
 
   Widget _header(BuildContext context) => Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
@@ -214,6 +259,8 @@ class _CompanionHomeState extends State<CompanionHome>
               tooltip: 'Parent area',
               onPressed: () => showParentSheet(
                     context,
+                    model: model,
+                    room: room,
                     motionEnabled: motionEnabled,
                     onMotionChanged: _setMotion,
                   ),
@@ -227,7 +274,6 @@ class _CompanionHomeState extends State<CompanionHome>
             room: room,
             overRoom: room.surfaceAttached,
             onTapCharacter: () => _cue(AvatarReaction.wave),
-            onStartOrientation: _startOrientation,
           ),
         CompanionDestination.learn => LearnPage(
             model: model,
@@ -238,7 +284,6 @@ class _CompanionHomeState extends State<CompanionHome>
         CompanionDestination.quests => QuestsPage(model: model),
         CompanionDestination.style => StylePage(
             model: model,
-            room: room,
             onEquipped: () => _cue(AvatarReaction.celebrate),
           ),
       };

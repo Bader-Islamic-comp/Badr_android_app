@@ -55,11 +55,26 @@ void main() {
     var writes = 0;
     final api = DemoApi(config, client: MockClient((request) async {
       if (request.method != 'GET') writes++;
-      return http.Response('{"items":[{"id":"default","owned":false}]}', 200);
+      return http.Response('{"items":[{"id":"sunset","owned":false}]}', 200);
     }));
-    await expectLater(api.equipDefault('equipment-key-123'),
+    await expectLater(api.equipCosmetic('sunset', 'equipment-key-123'),
         throwsA(isA<DemoApiException>()));
     expect(writes, 0);
+    api.close();
+  });
+
+  test('a claim the service does not confirm is a failure, not a look',
+      () async {
+    final api = DemoApi(config,
+        client: MockClient((_) async =>
+            // Right shape, wrong look: answering about another id must never
+            // be read as this one having been earned.
+            http.Response(
+                '{"cosmeticId":"dune","owned":true,"spent":0,'
+                '"balance":40}',
+                200)));
+    await expectLater(api.claimCosmetic('sunset', 'claim-key-123'),
+        throwsA(isA<DemoApiException>()));
     api.close();
   });
 

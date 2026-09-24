@@ -56,19 +56,19 @@ class Scrim extends StatelessWidget {
 
 /// The adult-operator notice. It stays until the release gates in
 /// `doc/development-boundary.md` pass.
+///
+/// It appears on every page except the character page, which carries no chrome
+/// at all. None of those pages sits over the live room, so the notice's own
+/// surface can simply be opaque.
 class DevelopmentBanner extends StatelessWidget {
-  const DevelopmentBanner({super.key, this.overRoom = false});
-
-  /// Opaque over a live room so the warning is never hard to read.
-  final bool overRoom;
+  const DevelopmentBanner({super.key});
 
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-            color: overRoom ? sandScrim : sand,
-            borderRadius: BorderRadius.circular(10)),
+        decoration:
+            BoxDecoration(color: sand, borderRadius: BorderRadius.circular(10)),
         child: const Text(
           'ADULT DEVELOPMENT PREVIEW · Synthetic data only. Not ready for children.',
           style:

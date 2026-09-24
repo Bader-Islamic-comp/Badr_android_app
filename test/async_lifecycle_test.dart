@@ -49,7 +49,7 @@ void main() {
         await tester.enterText(find.byType(TextField), 'Synthetic question');
       }
       final action = deleting
-          ? find.text('Clear development conversation')
+          ? find.byTooltip('Clear development conversation')
           : find.byTooltip('Send test question');
       await tester.ensureVisible(action);
       await tester.tap(action);

@@ -40,6 +40,13 @@ class FakeUnityHost {
   List<String> get types =>
       [for (final message in sent) message['type'] as String];
 
+  /// Looks requested through `avatar.set_cosmetics`, in order.
+  List<String> get looks => [
+        for (final message in sent)
+          if (message['type'] == 'avatar.set_cosmetics')
+            (message['payload'] as Map)['cosmeticId'] as String
+      ];
+
   /// Animations requested through `avatar.play`, in order.
   List<String> get plays => [
         for (final message in sent)

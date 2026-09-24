@@ -28,6 +28,9 @@ namespace Companion.Presentation.Editor
         private const string Manifest = Faces + "/animations.json";
         private const string Generated = "Assets/Companion/Generated";
         private const string SkinAsset = Generated + "/RobertSkin_default.asset";
+        private const string Backdrop = "Assets/Companion/Room/backdrop_desert.png";
+        private const string BackdropMesh = Generated + "/RoomBackdrop.mesh";
+        private const string BackdropMaterial = Generated + "/RoomBackdrop_Unlit.mat";
         private const string FaceMesh = "FaceScreen";
         private static readonly string[] BodyClips = { "Idle", "Wave", "Nod", "Celebrate" };
 
@@ -145,6 +148,7 @@ namespace Companion.Presentation.Editor
             AssetDatabase.Refresh();
 
             Material faceMaterial = CreateFaceMaterial(neutral);
+            CreateBackdropAssets();
             AnimatorController controller = CreateAnimator(clips);
             Bounds framing;
             GameObject prefab = CreatePrefab(model, faceMaterial, controller, neutral, out framing);
@@ -154,6 +158,30 @@ namespace Companion.Presentation.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return scenePath;
+        }
+
+        /// <summary>
+        /// Pins the backdrop's import settings. Clamped, because the quad shows
+        /// a centre crop of the image and a repeating edge would mirror the
+        /// picture back into frame on a wide screen.
+        /// </summary>
+        private static void ConfigureBackdropImporter()
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(Backdrop) as TextureImporter;
+            if (importer == null)
+            {
+                throw new InvalidOperationException(
+                    "No backdrop image at " + Backdrop + ". Generate it with " +
+                    "tools/make_backdrop.py.");
+            }
+            importer.textureType = TextureImporterType.Default;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.mipmapEnabled = true;
+            importer.alphaSource = TextureImporterAlphaSource.None;
+            importer.sRGBTexture = true;
+            importer.maxTextureSize = 2048;
+            importer.SaveAndReimport();
         }
 
         /// <summary>
@@ -413,6 +441,111 @@ namespace Companion.Presentation.Editor
             return result;
         }
 
+        /// <summary>
+        /// Creates the backdrop quad's mesh and unlit material.
+        ///
+        /// The mesh is built here rather than reusing Unity's primitive so the
+        /// winding is not a guess: it carries both windings, which makes the
+        /// quad visible from either side and removes any question of which way
+        /// the camera ends up facing it. Four extra triangles is a fair price
+        /// for a backdrop that cannot silently disappear.
+        /// </summary>
+        private static void CreateBackdropAssets()
+        {
+            ConfigureBackdropImporter();
+            Texture2D image = AssetDatabase.LoadAssetAtPath<Texture2D>(Backdrop);
+            if (image == null)
+            {
+                throw new InvalidOperationException("The backdrop at " + Backdrop + " did not import.");
+            }
+
+            Mesh mesh = new Mesh();
+            mesh.name = "RoomBackdropQuad";
+            mesh.vertices = new[]
+            {
+                new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
+                new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f)
+            };
+            mesh.uv = new[]
+            {
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(0f, 1f), new Vector2(1f, 1f)
+            };
+            mesh.normals = new[]
+            {
+                -Vector3.forward, -Vector3.forward, -Vector3.forward, -Vector3.forward
+            };
+            mesh.triangles = new[] { 0, 1, 2, 2, 1, 3, 0, 2, 1, 2, 3, 1 };
+            mesh.RecalculateBounds();
+            AssetDatabase.CreateAsset(mesh, BackdropMesh);
+
+            Shader shader = Shader.Find("Unlit/Texture") ??
+                            Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+            {
+                throw new InvalidOperationException(
+                    "No unlit shader found for the backdrop. Add an explicit " +
+                    "material adapter for this render pipeline.");
+            }
+            Material material = new Material(shader);
+            material.name = "RoomBackdrop_Unlit_Generated";
+            material.mainTexture = image;
+            AssetDatabase.CreateAsset(material, BackdropMaterial);
+
+            // Opening a new scene invalidates references to assets that exist
+            // only in memory, which serialises as a silent null. Flush first,
+            // so the scene can reload both from disk.
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>
+        /// Parks the backdrop behind the character and hands the runtime
+        /// component what it needs to keep filling whatever screen it lands on.
+        /// </summary>
+        private static void CreateBackdrop(Camera camera, float characterDistance)
+        {
+            Texture2D image = AssetDatabase.LoadAssetAtPath<Texture2D>(Backdrop);
+            Mesh mesh = AssetDatabase.LoadAssetAtPath<Mesh>(BackdropMesh);
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(BackdropMaterial);
+            if (image == null || mesh == null || material == null)
+            {
+                throw new InvalidOperationException(
+                    "The generated backdrop assets did not reload from disk.");
+            }
+
+            // Well behind the character, and inside the far plane with room to
+            // spare so the quad is never clipped away.
+            float distance = Mathf.Max(characterDistance * 2.5f, characterDistance + 4f);
+            camera.farClipPlane = Mathf.Max(camera.farClipPlane, distance * 2f);
+
+            GameObject backdrop = new GameObject("Room Backdrop");
+            backdrop.AddComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer renderer = backdrop.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            // Decoration: it neither casts nor receives the key light's shadows.
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+
+            RoomBackdrop component = backdrop.AddComponent<RoomBackdrop>();
+            SerializedObject serialized = new SerializedObject(component);
+            serialized.FindProperty("roomCamera").objectReferenceValue = camera;
+            serialized.FindProperty("distance").floatValue = distance;
+            serialized.FindProperty("imageAspect").floatValue =
+                image.height == 0 ? 2f : (float)image.width / image.height;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            Require(serialized, "roomCamera");
+
+            if (backdrop.GetComponent<MeshFilter>().sharedMesh == null ||
+                renderer.sharedMaterial == null)
+            {
+                throw new InvalidOperationException(
+                    "The generated scene left the backdrop quad without a mesh or material.");
+            }
+        }
+
         private static RobertSkinDefinition CreateSkinDefinition(GameObject prefab, Texture2D neutral)
         {
             RobertSkinDefinition skin = ScriptableObject.CreateInstance<RobertSkinDefinition>();
@@ -455,28 +588,31 @@ namespace Companion.Presentation.Editor
             GameObject cameraObject = new GameObject("Room Camera");
             Camera camera = cameraObject.AddComponent<Camera>();
             camera.clearFlags = CameraClearFlags.SolidColor;
-            // Transparent so the Flutter surface above it remains visible; the
-            // composition itself still has to be proven on a device.
-            camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+            // The backdrop covers the frustum, so this only shows in the frame
+            // before it is first sized. It is the image's own sky colour rather
+            // than the transparent clear this used to have: transparent meant a
+            // pitch-black window wherever the full-bleed page was not painting.
+            camera.backgroundColor = new Color(0.498f, 0.659f, 0.706f, 1f);
             // Frame the measured model rather than a guessed distance: the
             // character's real size is whatever the artist exported.
             const float fieldOfView = 40f;
-            // The page overlays cards from roughly its middle down, so the
-            // character has to fit comfortably in the upper part of the frame
-            // rather than merely fit on screen.
-            const float margin = 3.4f;
+            // The character page now carries only the character and one reply
+            // bubble, so the character can take the middle of the frame instead
+            // of hiding above a stack of cards. This still leaves the lower
+            // quarter clear for the bubble and the composer.
+            const float margin = 2.6f;
             camera.fieldOfView = fieldOfView;
             float extent = Mathf.Max(framing.size.x, framing.size.y, 0.1f);
             float distance =
                 extent * 0.5f / Mathf.Tan(fieldOfView * 0.5f * Mathf.Deg2Rad) * margin;
-            // Sit a little high and look slightly down, which lifts the
-            // character into the upper part of the frame where the page leaves
-            // room for it.
+            // Level with the model and barely tilted: pitching the camera down
+            // pushes the subject up the frame, which is what used to strand the
+            // character against the sky above the backdrop's horizon.
             camera.transform.position = new Vector3(
-                framing.center.x,
-                framing.center.y + extent * 0.12f,
-                framing.center.z + distance);
-            camera.transform.rotation = Quaternion.Euler(10f, 180f, 0f);
+                framing.center.x, framing.center.y, framing.center.z + distance);
+            camera.transform.rotation = Quaternion.Euler(2f, 180f, 0f);
+
+            CreateBackdrop(camera, distance);
 
             GameObject lightObject = new GameObject("Key Light");
             Light light = lightObject.AddComponent<Light>();

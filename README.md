@@ -18,30 +18,57 @@ implemented.
 | Path | Contents |
 |---|---|
 | `lib/` | Application source: `bridge/`, `data/`, `domain/`, `ui/` |
-| `assets/` | Runtime assets only — the static preview and the Robert character package |
-| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked) |
+| `assets/` | Runtime assets only — the static preview, the shared room backdrop and the Robert character package |
+| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus `room-on-device.png` and `customization-tab.png` from the emulator |
 | `unity/` | The Unity character-room project, its room builder and its test scripts |
 | `archive/` | Untracked: superseded character revisions and the packaged distributable |
 | `contracts/` | Versioned API and bridge schemas shared with `comp-server` |
 | `doc/`, `docs/` | Roadmap, development boundary, and the character-page design |
+| `CHANGELOG.md` | What each development increment changed, and what it verified |
 
 ## Character-first main page
 
-The main page follows [`design/ui-reference.png`](design/ui-reference.png) —
-compact header, central character room, greeting or validated reply surface,
-bottom composer, compact navigation — while keeping the ivory, teal and orange
-palette rather than the reference's dark violet. Its example balance, example
-content and implied microphone are deliberately not copied.
+The layout started from [`design/ui-reference.png`](design/ui-reference.png) —
+character-first hierarchy, a reply surface, a bottom composer and compact
+navigation — keeping the ivory, teal and orange palette rather than the
+reference's dark violet, and not copying its example balance, example content or
+implied microphone. It has since been cut back further than the reference: the
+character page now carries no header and no greeting card, only the character,
+the last reply and the composer.
 
-Four destinations: **Talk** (the character page and composer), **Learn**
+Four destinations: **Talk** (the character and the composer), **Learn**
 (orientation), **Quests** (challenges and the server-owned balance) and
-**Style** (cosmetics). The star chip renders nothing at all until the service
-reports a balance. Lesson, challenge and inventory content now comes from the
-service and is parsed strictly: anything that is not `kind: "orientation"` is
-rejected rather than displayed, so unreviewed content cannot reach the screen by
-loosening a client check.
+**Style** (the customization tab). The star chip renders nothing at all until
+the service reports a balance. Lesson, challenge and inventory content comes
+from the service and is parsed strictly: anything that is not
+`kind: "orientation"`, and any look without a price the app can make sense of,
+is rejected rather than displayed, so unreviewed content cannot reach the screen
+by loosening a client check.
 
-Below roughly 240 logical pixels of page height the character room yields its
+**Talk carries the character, the composer and nothing else.** The last answer
+sits in a single bubble just above the composer; with no answer yet the page is
+just Robert. Earlier answers are not kept. Everything else moved to where it
+belongs — the orientation prompt to Learn, the service connection to Quests,
+Style and the parent area, and the room's own state and its retry to the parent
+area, because how the renderer is doing is developer state and does not belong
+over a character's face. Clearing stays beside the reply, because it deletes the
+server conversation as well as the answer, and it remains reachable whenever a
+conversation exists even if no answer is showing.
+
+The app header and the adult-operator notice are also off this one page, and on
+for the other three, so the balance, the parent entry and the notice are always
+one tap away rather than gone. The notice stays until the release gates in
+[`doc/development-boundary.md`](doc/development-boundary.md) pass; what changed
+is where it appears, not whether it does.
+
+**Robert exists only on Talk.** The other pages show the same desert from
+`assets/room/backdrop_desert.png` — the very image the Unity room renders,
+written by the same generator — veiled so a headline stays readable over it. So
+they read as the same place with the character absent, rather than as a live
+scene with text on top of him, and they look the same whether or not a Unity
+room is running.
+
+Below roughly 260 logical pixels of page height the character room yields its
 space entirely — readable text and a reachable composer take priority over
 keeping Robert visible.
 
@@ -49,18 +76,29 @@ The layout is **full bleed when, and only when, a room is composited behind
 Flutter**. `AvatarRoom.surfaceAttached` asks the host whether a surface exists,
 deliberately independent of the bridge handshake, and that alone decides whether
 the page paints. With a room the scaffold and the character stage are
-transparent so the live 3D shows through, and anything carrying text — header,
-development notice, status line, notices, composer and navigation — keeps its
-own scrim, because a 3D scene cannot be relied on for contrast. Without a room
-the page stays opaque ivory and the stage shows the static preview on its card;
-painting transparently with nothing behind it would show an empty window.
+transparent so the live 3D shows through, and the few things that do carry text
+there — a service notice, the reply bubble, the composer and the navigation —
+keep their own surface, because a 3D scene cannot be relied on for contrast.
+Without a room the page stays opaque ivory and the stage shows the static
+preview on its card; painting transparently with nothing behind it would show an
+empty window. Only the character page is ever transparent: the other three are
+backed by the veiled backdrop image, so nothing there needs a scrim.
 
 ## Character boundary
 
 `AvatarBridge` uses `companion/unity_commands` (`sendMessage`, `openRoom`,
 `disposeRoom`) and `companion/unity_events` with bridge v1 envelopes.
 Initialization negotiates supported capabilities and requires an acknowledgement
-plus `unity.ready`. Equipment acknowledgements have a deadline. Unknown
+plus `unity.ready`. Equipment acknowledgements have a deadline.
+
+Two of these waits are not like the others. Initialization and the surface probe
+wait on the host **starting an engine**, which takes seconds, not on a room that
+is already answering; both use `AvatarBridge.startupTimeout` rather than the
+ordinary `timeout`. Using the 3-second bridge timeout for the handshake meant it
+gave up before Unity had finished loading, on every launch — see
+[`unity/README.md`](unity/README.md). A look outside
+the four the room was built with is refused here without touching the room — the
+room is not broken, it simply has nothing to install. Unknown
 capability cues are not sent; malformed events are ignored; missing hosts, asset
 failures and failed commands fall back to the static avatar.
 
@@ -96,8 +134,16 @@ Unity.
 
 ## Prepare and run
 
-Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 28 tests
+Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 33 tests
 pass. Dependency versions are recorded in `pubspec.lock`.
+
+The SDK is **vendored, not installed**: it lives beside the repositories at
+`../../comp/.tools/flutter` and is not on `PATH`, so `flutter` alone will not
+resolve. Put it on `PATH` for the session first, or call it by full path.
+
+```powershell
+$env:Path = "$HOME\Desktop\comp\.toolslutterin;$env:Path"
+```
 
 ```powershell
 flutter pub get
@@ -106,15 +152,23 @@ flutter test
 flutter run
 ```
 
+`adb` is on `PATH` from `C:\Android\platform-tools`. The Android SDK and its
+emulator are under `$env:LOCALAPPDATA\Android\Sdk`, and the development AVD is
+named `companion`.
+
 Run `dart format lib test`, `flutter analyze` and `flutter test` after changes.
 
 Android builds succeed: `flutter build apk --debug` and `--release` both
-produce an APK (release 49.3 MB), and the Kotlin host in
-`android/app/src/main/kotlin/` compiles into both. The APK requests `INTERNET`
-only — no microphone, camera or location permission. **Nothing has been run on a
-device or emulator**: none is available here, so startup, memory, frame time,
-TalkBack, keyboard insets and rotation are all still unmeasured, and no
-performance budget has been approved to measure against.
+produce an APK (release 49.3 MB without a Unity export; 125 MB debug with the
+x86_64 export, which is a debug, single-ABI number and not a shipping size), and
+the Kotlin host in `android/app/src/main/kotlin/` compiles into both. The APK
+requests `INTERNET` only — no microphone, camera or location permission.
+
+The app has been run on an **Android 16 x86_64 emulator**: the character room
+renders, the bridge handshake completes, and an earned look sent over the bridge
+recolours the character. **No physical device has been used**, so startup, memory, frame
+time, ARM64, TalkBack, keyboard insets and rotation are all still unmeasured,
+and no performance budget has been approved to measure against.
 
 `android/settings.gradle.kts` includes the exported Unity room as
 `:unityLibrary` **only when `unity/export/unityLibrary` exists**, so the app
@@ -134,11 +188,11 @@ change.
 iOS platform builds require macOS and Xcode and have not been run. The included
 web target provides an offline development preview
 (`flutter build web --no-web-resources-cdn`); web API testing requires explicit
-backend CORS configuration, which is currently disabled. A live character room is
-still unavailable in every wrapper: no `unityLibrary` export has been produced,
-so `UnityRuntime` finds no player to create and the app shows the static
-avatar. Producing one needs a glTF importer, a room scene and a Unity Android
-export, none of which exist yet.
+backend CORS configuration, which is currently disabled. A live character room
+exists only in the Android wrapper, and only once
+`unity/CompanionRoomBuilder.ExportAndroidBatch` has produced an export; without
+one `UnityRuntime` finds no player to create and the app shows the static
+avatar everywhere.
 
 The default run performs no backend requests. It supports a local orientation,
 labels local completion accurately and never invents a reward balance. The parent
@@ -160,11 +214,24 @@ needs a reachable HTTPS development host. Never commit a real token. Dart define
 are embedded in the binary and are **not** appropriate for production secrets or
 authentication.
 
-Connection is user initiated from any page's connection card. The bootstrap must
-identify the synthetic development profile, disabled voice/generation and
-awaiting-review content. Completion, balance, challenge state, lessons and
-inventory come from the service. Equipment requires an ownership check and a
-confirmed server write before the sanitized bridge cue. Write retries reuse their
+Connection is user initiated from the connection card on Quests, Style or the
+parent area. The bootstrap must identify the synthetic development profile,
+disabled voice/generation and awaiting-review content. Completion, balance,
+challenge state, lessons and inventory come from the service.
+
+Looks are earned and worn through the service, never on the device. **Style**
+shows the catalogue with its price, what is earned, what is worn and how many
+more stars a locked look needs. Earning posts to `/v1/cosmetics/claim` and then
+re-reads the balance rather than subtracting locally; wearing re-checks
+ownership and writes `/v1/equipped-cosmetics`. Claim and equip keys are per
+look, so a retry reuses its own key and no look is answered with another's
+recorded result.
+
+The room is then told by the **shell**, watching what the service reports as
+worn — not by the tap that changed it. Earning is not wearing, so a claim alone
+tells the room nothing; and because the cue follows server state rather than a
+gesture, the worn look comes back by itself after a relaunch or a room rebuild,
+neither of which involves a tap. Write retries reuse their
 idempotency key; question retries resume a known turn. The UI fetches a complete
 validated turn with REST; it does not expose token streaming. The shared SSE
 endpoint is reserved for later resume/stream UI work.
@@ -177,7 +244,7 @@ or deletion.
 
 ## Verification coverage and remaining work
 
-The 28-test suite covers no-network default mode, server-owned rewards, ownership
+The 33-test suite covers no-network default mode, server-owned rewards, ownership
 rejection, idempotent completion headers, resuming known question turns,
 sanitized failures, missing native host, malformed bridge events, cancellation of
 native deadlines on disposal, asynchronous send/delete disposal, offline
@@ -186,16 +253,23 @@ foreground policy, reduced motion, the bounded reaction queue, coordinated room
 recreation and its bound, and activatable button semantics for the orientation
 controls.
 
+Five of those tests cover the customization tab specifically: that a look is
+earned from the service rather than granted on the device, that the balance is
+re-read rather than adjusted locally, that a refused claim spends nothing and
+wears nothing, that a claim whose response names a different look is a failure
+rather than an unlock, and — end to end through a fake Unity host — that
+`avatar.set_cosmetics` reaches the room only after the equipment write is
+confirmed, and never on the claim alone.
+
 A browser check of the built web preview previously found the orientation
 buttons missing from the accessibility tree. They are now exposed as buttons
 with labels, hints and tap actions, asserted in the widget tests and confirmed
 again in the browser accessibility tree.
 
-The Unity kit is compiled and exercised separately in a real Editor: 34
-engine-free checks over the bridge decision core plus 11 EditMode tests over the
-receiver. See [`unity/README.md`](unity/README.md). No scene, imported model or
-Android export exists yet, so the character room has never rendered and the
-Unity-as-a-Library composition is still unproven.
+The Unity kit is compiled and exercised separately in a real Editor: 36
+engine-free checks over the bridge decision core plus 12 EditMode tests over the
+receiver. See [`unity/README.md`](unity/README.md) for what the room builder,
+the desert backdrop and the emulator run do and do not settle.
 
 Remaining gates include native host integration and device validation, real
 guardian identity and consent, secure token storage, persisted server state,

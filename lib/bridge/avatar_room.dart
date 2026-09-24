@@ -131,8 +131,8 @@ class AvatarRoom extends ChangeNotifier {
 
   Future<bool> openRoom() => _bridge.openRoom();
 
-  Future<bool> applyServerConfirmedDefault() =>
-      _bridge.applyServerConfirmedDefault();
+  Future<bool> applyServerConfirmedCosmetic(String cosmeticId) =>
+      _bridge.applyServerConfirmedCosmetic(cosmeticId);
 
   @override
   void dispose() {

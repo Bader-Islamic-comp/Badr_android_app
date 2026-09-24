@@ -7,8 +7,8 @@ import '../theme.dart';
 ///
 /// With a room composited behind Flutter the page is full-bleed: this reserves
 /// the space and stays transparent so the live 3D shows through, carrying only
-/// a status line and the tap target. Without one it falls back to the supplied
-/// static preview on its own card.
+/// the tap target. Without one it falls back to the supplied static preview on
+/// its own card.
 ///
 /// It deliberately applies no motion to that static image: animating a PNG
 /// would misrepresent a 3D runtime that is not there.
@@ -38,7 +38,12 @@ class CharacterStage extends StatelessWidget {
 
   bool get _ready => status == AvatarStatus.ready;
 
-  String get _statusLabel => switch (status) {
+  /// How the room is doing, in words. The character page does not show this —
+  /// it is developer state, not something a child needs over Robert's face —
+  /// so the parent area renders it instead.
+  static String statusLabel(
+          AvatarStatus status, bool animating, bool surfaceAttached) =>
+      switch (status) {
         AvatarStatus.ready =>
           animating ? 'Character room · playing' : 'Character room · paused',
         AvatarStatus.connecting => 'Looking for the character room…',
@@ -67,11 +72,15 @@ class CharacterStage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _statusRow(),
-                const SizedBox(height: 8),
                 Flexible(
                     child: _roomSurface(height: figure < 72 ? 72 : figure)),
-                if (_ready && onOpenRoom != null && !compact) ...[
+                // Only meaningful when the room is not already the page's
+                // background. Over a full-bleed room it would sit across the
+                // character's feet and open what is already open.
+                if (_ready &&
+                    onOpenRoom != null &&
+                    !compact &&
+                    !surfaceAttached) ...[
                   const SizedBox(height: 10),
                   OutlinedButton(
                       onPressed: onOpenRoom,
@@ -82,37 +91,6 @@ class CharacterStage extends StatelessWidget {
           );
         },
       );
-
-  Widget _statusRow() {
-    final row = Row(children: [
-      Icon(Icons.circle, size: 8, color: _ready ? teal : muted),
-      const SizedBox(width: 8),
-      Flexible(
-          child: Text(_statusLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, fontSize: 13, color: ink))),
-      if (!motionEnabled) ...[
-        const SizedBox(width: 6),
-        const Tooltip(
-            message: 'Reduced motion is on',
-            child:
-                Icon(Icons.motion_photos_off_outlined, size: 18, color: muted)),
-      ],
-    ]);
-    if (!surfaceAttached) return row;
-    // Over a live scene the label needs its own surface to stay legible.
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-            color: ivoryScrim, borderRadius: BorderRadius.circular(999)),
-        child: IntrinsicWidth(child: row),
-      ),
-    );
-  }
 
   Widget _roomSurface({required double height}) {
     // A live room draws itself behind this; painting anything here would cover

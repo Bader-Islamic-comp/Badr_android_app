@@ -7,15 +7,21 @@ import '../theme.dart';
 import 'character_stage.dart';
 import 'widgets.dart';
 
-/// The character-first main page: character room above, validated reply surface
-/// below. The composer lives in the shell so it stays above the keyboard.
+/// The character-first main page.
+///
+/// Deliberately sparse: the character, and the one reply it last gave. With no
+/// reply yet there is nothing on the page but Robert. Earlier answers are not
+/// kept, the orientation prompt lives on Learn, the service connection lives on
+/// Quests, Style and the parent area, and the room's own state and retry live
+/// in the parent area — a page that is mostly character reads as a companion,
+/// and a stack of cards does not. The composer lives in the shell so it stays
+/// above the keyboard.
 class TalkPage extends StatelessWidget {
   const TalkPage({
     super.key,
     required this.model,
     required this.room,
     required this.onTapCharacter,
-    required this.onStartOrientation,
     this.overRoom = false,
   });
 
@@ -25,22 +31,22 @@ class TalkPage extends StatelessWidget {
   /// True when a room is composited behind the page.
   final bool overRoom;
   final VoidCallback onTapCharacter;
-  final VoidCallback onStartOrientation;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
         builder: (context, constraints) {
-          // Give the character room a share of the page, but surrender it
-          // entirely once the reply and controls would stop being readable.
           final height = constraints.maxHeight;
-          final stage =
-              height < 240 ? 0.0 : (height * 0.46).clamp(140.0, 320.0);
+          // Readable text and a reachable composer come first: below this the
+          // character gives up its space entirely rather than squeezing the
+          // reply into a few lines.
+          final showCharacter = height >= 260;
+          final replyLimit = (height * 0.42).clamp(96.0, 340.0);
+          final reply = _reply(context);
           return Column(children: [
-            if (stage > 0)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: SizedBox(
-                  height: stage,
+            if (showCharacter)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: CharacterStage(
                     status: room.status,
                     animating: room.bridge.animating,
@@ -53,129 +59,81 @@ class TalkPage extends StatelessWidget {
                   ),
                 ),
               ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                children: [
-                  if (model.answer == null)
-                    _greeting(context)
-                  else
-                    _reply(context),
-                  if (model.canRetryQuestion)
-                    Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Scrim(
-                            enabled: overRoom,
-                            child: const Text(
-                                'Retry keeps the same request so the service '
-                                'never receives a duplicate submission.',
-                                style: TextStyle(fontSize: 13, color: muted)))),
-                  if (model.hasConversation || model.canRetryQuestion)
-                    Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: OutlinedButton.icon(
-                            onPressed:
-                                model.busy ? null : model.clearConversation,
-                            icon: const Icon(Icons.delete_outline),
-                            label:
-                                const Text('Clear development conversation'))),
-                  if (!model.connected) ...[
-                    const SizedBox(height: 16),
-                    ConnectionCard(
-                      connected: model.connected,
-                      configured: model.api.config.enabled,
-                      busy: model.busy,
-                      onConnect: model.connect,
-                    ),
-                  ],
-                  if (room.canRetry) ...[
-                    const SizedBox(height: 16),
-                    _roomRetry(context),
-                  ],
-                  const SizedBox(height: 16),
-                  _orientationPrompt(context),
-                ],
-              ),
-            ),
+            if (showCharacter)
+              ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: replyLimit),
+                  child: reply)
+            else
+              Expanded(child: reply),
           ]);
         },
       );
 
-  Widget _greeting(BuildContext context) => Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 420),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: hairline),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(6),
-                topRight: Radius.circular(20),
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(20),
-              )),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Hello, explorer.',
-                    style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 6),
-                const Text('Small steps are a lovely place to start.'),
-              ]),
+  /// The last answer and nothing else, sitting just above the composer. With no
+  /// answer there is no bubble at all — an empty page is the character's.
+  /// `reverse` keeps a short bubble against the composer and lets a long answer
+  /// scroll from its end.
+  Widget _reply(BuildContext context) {
+    final answer = model.answer;
+    // Clearing stays reachable whenever a server conversation exists, not only
+    // when an answer is on screen: a send that failed leaves one behind, and
+    // deleting it is the whole point of the control.
+    final clearable = model.hasConversation || model.canRetryQuestion;
+    if (answer == null && !clearable) return const SizedBox.shrink();
+    return ListView(
+      reverse: true,
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      children: [
+        Semantics(
+          liveRegion: answer != null,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 520),
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: hairline),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(6),
+                    topRight: Radius.circular(20),
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  )),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _bubbleHeader(answer),
+                    if (answer == null)
+                      // A conversation exists but its answer is gone: all this
+                      // bubble is for now is the control that deletes it.
+                      const Text('Nothing to show from this conversation.',
+                          style: TextStyle(fontSize: 15, color: muted))
+                    else
+                      Text(answer,
+                          style: Theme.of(context).textTheme.bodyLarge),
+                  ]),
+            ),
+          ),
         ),
-      );
+      ],
+    );
+  }
 
-  Widget _reply(BuildContext context) => Semantics(
-        liveRegion: true,
-        child: Panel(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const SectionLabel('Service response', color: teal),
-            const SizedBox(height: 10),
-            Text(model.answer!, style: Theme.of(context).textTheme.bodyLarge),
-          ]),
+  /// Clearing is the one control that belongs beside the reply: it removes the
+  /// answer and asks the service to delete the conversation it came from.
+  Widget _bubbleHeader(String? answer) => Row(children: [
+        Expanded(
+            child: answer == null
+                ? const SizedBox.shrink()
+                : const SectionLabel('Service response', color: teal)),
+        IconButton(
+          tooltip: 'Clear development conversation',
+          visualDensity: VisualDensity.compact,
+          onPressed: model.busy ? null : model.clearConversation,
+          icon: const Icon(Icons.close_rounded, size: 20),
         ),
-      );
-
-  Widget _roomRetry(BuildContext context) => Panel(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('The character room stopped',
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          const Text(
-              'Robert’s static preview is shown instead. Learning and chat are '
-              'unaffected. Trying again rebuilds the room from scratch.'),
-          const SizedBox(height: 16),
-          OutlinedButton(
-              onPressed: room.recreating ? null : room.retry,
-              child: Text(room.recreating
-                  ? 'Rebuilding the room…'
-                  : 'Try the character room again')),
-        ]),
-      );
-
-  Widget _orientationPrompt(BuildContext context) => Panel(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SectionLabel('Your first little step'),
-          const SizedBox(height: 10),
-          Text(model.orientation.title,
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(model.orientation.summary),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-              onPressed: onStartOrientation,
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: Text(model.orientationComplete
-                  ? 'Explore again'
-                  : 'Let’s explore')),
-          const SizedBox(height: 14),
-          const Text(
-              'Religious lessons and stories appear only after qualified human '
-              'review. No AI provider is enabled.',
-              style: TextStyle(fontSize: 13, color: muted)),
-        ]),
-      );
+      ]);
 }

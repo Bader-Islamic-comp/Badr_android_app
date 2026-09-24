@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../bridge/avatar_room.dart';
+import '../domain/companion_controller.dart';
+import 'character_stage.dart';
+import 'widgets.dart';
+
 Future<void> showParentSheet(
   BuildContext context, {
+  required CompanionController model,
+  required AvatarRoom room,
   required bool motionEnabled,
   required ValueChanged<bool> onMotionChanged,
 }) =>
@@ -10,6 +17,8 @@ Future<void> showParentSheet(
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _ParentSheet(
+        model: model,
+        room: room,
         motionEnabled: motionEnabled,
         onMotionChanged: onMotionChanged,
       ),
@@ -17,10 +26,14 @@ Future<void> showParentSheet(
 
 class _ParentSheet extends StatefulWidget {
   const _ParentSheet({
+    required this.model,
+    required this.room,
     required this.motionEnabled,
     required this.onMotionChanged,
   });
 
+  final CompanionController model;
+  final AvatarRoom room;
   final bool motionEnabled;
   final ValueChanged<bool> onMotionChanged;
 
@@ -63,6 +76,34 @@ class _ParentSheetState extends State<_ParentSheet> {
                       'stays visible and every reply is still readable. This '
                       'follows your device’s reduce-motion setting by default.'),
                 ),
+                // The room's own state used to sit on the character page, over
+                // Robert's face. It is developer state: what belongs here is
+                // what an adult would act on, which is whether it is running
+                // and how to restart it.
+                ListenableBuilder(
+                  listenable: widget.room,
+                  builder: (context, _) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.smart_toy_outlined),
+                    title: Text(CharacterStage.statusLabel(
+                      widget.room.status,
+                      widget.room.bridge.animating,
+                      widget.room.surfaceAttached,
+                    )),
+                    subtitle: const Text(
+                        'Learning and chat do not depend on the room. Robert '
+                        'falls back to a still picture if it stops.'),
+                    trailing: widget.room.canRetry || widget.room.recreating
+                        ? TextButton(
+                            onPressed: widget.room.recreating
+                                ? null
+                                : widget.room.retry,
+                            child: Text(widget.room.recreating
+                                ? 'Rebuilding…'
+                                : 'Restart'))
+                        : null,
+                  ),
+                ),
                 const Divider(height: 32),
                 const ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -85,6 +126,19 @@ class _ParentSheetState extends State<_ParentSheet> {
                         'Do not enter child information. Real accounts, '
                         'consent, export and profile deletion require further '
                         'implementation and review.')),
+                const SizedBox(height: 16),
+                // The service is developer-operated, so its connection belongs
+                // with the other adult controls rather than on the character
+                // page, which now carries only Robert and his last reply.
+                ListenableBuilder(
+                  listenable: widget.model,
+                  builder: (context, _) => ConnectionCard(
+                    connected: widget.model.connected,
+                    configured: widget.model.api.config.enabled,
+                    busy: widget.model.busy,
+                    onConnect: widget.model.connect,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                     width: double.infinity,

@@ -36,6 +36,7 @@ namespace Companion.Presentation
         private IUnityEventTransport transport;
         private BridgeSession session;
         private long outgoing;
+        private bool announced;
 
         private void Awake()
         {
@@ -61,9 +62,9 @@ namespace Companion.Presentation
         }
 
         /// <summary>
-        /// Attaches the platform transport. Readiness is announced immediately
-        /// so a host that binds before Flutter subscribes is not lost; the
-        /// receiver repeats `unity.ready` after an accepted initialization.
+        /// Attaches the platform transport. Readiness follows as soon as the
+        /// room can actually perform, which may be this call or a later frame;
+        /// the receiver repeats `unity.ready` after an accepted initialization.
         /// </summary>
         public bool BindTransport(IUnityEventTransport value)
         {
@@ -71,6 +72,25 @@ namespace Companion.Presentation
             transport = value;
             AnnounceReadiness();
             return true;
+        }
+
+        /// <summary>
+        /// Readiness is the only unprompted event this room sends, and the host
+        /// releases every held command the moment it arrives. Announcing it
+        /// from `Awake` therefore raced the scene: the skin controller installs
+        /// the visual in `Start`, so the first command landed while the
+        /// presentation was still unavailable, came back `asset_unavailable`,
+        /// and Flutter fell back to the static avatar for good — on every
+        /// launch, with the room rendering perfectly behind it.
+        ///
+        /// So keep trying until the room can perform. A room whose assets never
+        /// arrive simply never claims readiness, and Flutter's own deadline
+        /// falls back, which is the outcome that was wanted anyway.
+        /// </summary>
+        private void Update()
+        {
+            if (announced) return;
+            AnnounceReadiness();
         }
 
         /// <summary>Entry point for Unity native messaging. Never throws.</summary>
@@ -100,7 +120,10 @@ namespace Companion.Presentation
 
         private void AnnounceReadiness()
         {
-            if (transport == null || !transport.IsConnected || session == null) return;
+            // Cheap checks first: this runs every frame until it succeeds, and
+            // asking the transport costs a JNI call on Android.
+            if (session == null || presentation == null || !presentation.IsAvailable) return;
+            if (transport == null || !transport.IsConnected) return;
             StringBuilder builder = new StringBuilder();
             builder.Append("{\"characterId\":\"robert\",\"capabilities\":[");
             string[] capabilities = session.Initialized
@@ -113,6 +136,7 @@ namespace Companion.Presentation
             }
             builder.Append("]}");
             Emit("unity.ready", builder.ToString());
+            announced = true;
         }
 
         private string[] InstalledCapabilities()

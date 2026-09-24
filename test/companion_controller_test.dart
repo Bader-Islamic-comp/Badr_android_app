@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:companion_mobile/data/demo_api.dart';
 import 'package:companion_mobile/domain/companion_controller.dart';
+import 'package:companion_mobile/domain/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -225,6 +226,132 @@ void main() {
     expect(deletes, 1);
     expect(model.hasConversation, isFalse);
     expect(model.canRetryQuestion, isFalse);
+    model.dispose();
+  });
+
+  test('a look is earned from the service, never granted on the device',
+      () async {
+    var owned = false;
+    var claims = 0;
+    var equips = 0;
+    Map<String, Object> look(
+            String id, int cost, bool isOwned, bool equipped) =>
+        {
+          'id': id,
+          'characterId': 'robert',
+          'name': id,
+          'description': 'A synthetic look.',
+          'cost': cost,
+          'owned': isOwned,
+          'equipped': equipped,
+        };
+    final api = DemoApi(config, client: MockClient((request) async {
+      final Object result;
+      switch (request.url.path) {
+        case '/v1/bootstrap':
+          result = bootstrap;
+        case '/v1/lessons':
+          result = lessons;
+        case '/v1/rewards':
+          // The balance only ever comes from here, so spending shows up as the
+          // service reporting less, not as the app subtracting.
+          result = {'balance': owned ? 0 : 5, 'unit': 'learning_stars'};
+        case '/v1/challenges/today':
+          result = {'items': []};
+        case '/v1/inventory':
+          result = {
+            'items': [
+              look('default', 0, true, !owned),
+              look('sunset', 5, owned, owned),
+            ]
+          };
+        case '/v1/cosmetics/claim':
+          claims++;
+          owned = true;
+          result = {
+            'cosmeticId': 'sunset',
+            'owned': true,
+            'spent': 5,
+            'balance': 0
+          };
+        case '/v1/equipped-cosmetics':
+          equips++;
+          result = {'cosmeticId': 'sunset', 'characterId': 'robert'};
+        default:
+          return http.Response('{}', 404);
+      }
+      return http.Response(jsonEncode(result), 200);
+    }));
+    final model = CompanionController(api);
+
+    const locked = Cosmetic(
+        id: 'sunset',
+        characterId: 'robert',
+        name: 'sunset',
+        description: 'A synthetic look.',
+        cost: 5,
+        owned: false,
+        equipped: false);
+
+    // Offline, nothing is earned and nothing is written.
+    expect(await model.claimCosmetic(locked), isFalse);
+    expect(claims, 0);
+
+    await model.connect();
+    expect(model.canAfford(locked), isTrue);
+    expect(model.equippedCosmeticId, 'default');
+
+    expect(await model.claimCosmetic(locked), isTrue);
+    expect(claims, 1);
+    // Re-read rather than adjusted: the service decides what is left.
+    expect(model.balance, 0);
+    expect(model.cosmetics.firstWhere((c) => c.id == 'sunset').owned, isTrue);
+
+    expect(await model.equipCosmetic(locked), isTrue);
+    expect(equips, 1);
+    expect(model.equippedCosmeticId, 'sunset');
+    model.dispose();
+  });
+
+  test('a look the service refuses is not worn and does not spend twice',
+      () async {
+    var claims = 0;
+    final api = DemoApi(config, client: MockClient((request) async {
+      switch (request.url.path) {
+        case '/v1/bootstrap':
+          return http.Response(jsonEncode(bootstrap), 200);
+        case '/v1/lessons':
+          return http.Response(jsonEncode(lessons), 200);
+        case '/v1/rewards':
+          return http.Response('{"balance":0,"unit":"learning_stars"}', 200);
+        case '/v1/challenges/today':
+          return http.Response('{"items":[]}', 200);
+        case '/v1/inventory':
+          return http.Response(jsonEncode(inventory), 200);
+        case '/v1/cosmetics/claim':
+          claims++;
+          // Not enough stars: the service is the only thing that decides.
+          return http.Response('{"error":{"code":"insufficient_stars"}}', 403);
+        default:
+          return http.Response('{}', 404);
+      }
+    }));
+    final model = CompanionController(api);
+    await model.connect();
+
+    const dear = Cosmetic(
+        id: 'midnight',
+        characterId: 'robert',
+        name: 'midnight',
+        description: 'A synthetic look.',
+        cost: 30,
+        owned: false,
+        equipped: false);
+    expect(model.canAfford(dear), isFalse);
+    expect(await model.claimCosmetic(dear), isFalse);
+    expect(claims, 1);
+    expect(model.cosmetics.any((c) => c.id == 'midnight'), isFalse);
+    expect(model.notice, isNotNull);
     model.dispose();
   });
 }

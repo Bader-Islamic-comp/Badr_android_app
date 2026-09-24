@@ -110,21 +110,32 @@ class DemoApi {
   Future<Map<String, dynamic>> challenges() =>
       request('GET', '/v1/challenges/today');
 
-  Future<void> equipDefault(String key) async {
+  /// Spends earned stars on a look. The service owns the price and the
+  /// balance; this never sends either, so a tampered client cannot buy one.
+  Future<void> claimCosmetic(String cosmeticId, String key) async {
+    final result = await request('POST', '/v1/cosmetics/claim',
+        body: {'cosmeticId': cosmeticId}, key: key);
+    if (result['cosmeticId'] != cosmeticId || result['owned'] != true) {
+      throw const DemoApiException('The service did not confirm this look.');
+    }
+  }
+
+  /// Wears a look the service already records as owned. Ownership is read back
+  /// first so a look is never pushed to the room on the app's say-so.
+  Future<void> equipCosmetic(String cosmeticId, String key) async {
     final inventoryResult = await inventory();
     final items = inventoryResult['items'];
     if (items is! List ||
         !items.any((item) =>
             item is Map &&
-            item['id'] == 'default' &&
+            item['id'] == cosmeticId &&
             item['characterId'] == 'robert' &&
             item['owned'] == true)) {
-      throw const DemoApiException(
-          'Robert Original is not available in inventory.');
+      throw const DemoApiException('That look is not earned yet.');
     }
     final result = await request('PUT', '/v1/equipped-cosmetics',
-        body: {'cosmeticId': 'default'}, key: key);
-    if (result['cosmeticId'] != 'default' ||
+        body: {'cosmeticId': cosmeticId}, key: key);
+    if (result['cosmeticId'] != cosmeticId ||
         result['characterId'] != 'robert') {
       throw const DemoApiException(
           'The service did not confirm this appearance.');

@@ -121,6 +121,8 @@ class Cosmetic {
     required this.id,
     required this.characterId,
     required this.name,
+    required this.description,
+    required this.cost,
     required this.owned,
     required this.equipped,
   });
@@ -130,10 +132,19 @@ class Cosmetic {
       throw const DemoApiException(
           'The service returned unexpected inventory state.');
     }
+    // A price the app cannot make sense of is a rejected payload, not a look
+    // shown as free: what a look costs decides what the page offers to spend.
+    final cost = json['cost'];
+    if (cost is! int || cost < 0 || cost > _maxReward) {
+      throw const DemoApiException(
+          'The service returned an unexpected cosmetic price.');
+    }
     return Cosmetic(
       id: _identifier(json['id']),
       characterId: _identifier(json['characterId']),
       name: _text(json['name'], _maxTitle, 'a cosmetic name'),
+      description: _text(json['description'], _maxBody, 'a cosmetic summary'),
+      cost: cost,
       owned: json['owned'] as bool,
       equipped: json['equipped'] as bool,
     );
@@ -145,6 +156,11 @@ class Cosmetic {
   final String id;
   final String characterId;
   final String name;
+  final String description;
+
+  /// Learning stars the service charges for this look. Zero means it arrives
+  /// with the character, never that it can be taken without earning it.
+  final int cost;
   final bool owned;
   final bool equipped;
 }

@@ -11,13 +11,30 @@ const sand = Color(0xFFF3E6D1);
 const hairline = Color(0xFFE2E5DB);
 const muted = Color(0xFF4F6D6B);
 
-/// Scrims for the full-bleed layout. When the character room is composited
-/// behind Flutter the page itself is transparent, so anything carrying text
-/// needs its own surface: a 3D scene is not a background you can rely on for
-/// contrast. Each is the ordinary colour at high opacity, so the palette reads
-/// the same whether or not a room is present.
+/// Scrim for the full-bleed character page. With the room composited behind
+/// Flutter the page itself is transparent, so anything carrying text needs its
+/// own surface: a 3D scene is not a background you can rely on for contrast.
+/// It is the ordinary ivory at high opacity, so the palette reads the same
+/// whether or not a room is present.
 const ivoryScrim = Color(0xF2FAF7EF);
-const sandScrim = Color(0xF2F3E6D1);
+
+/// Veil over the backdrop on the pages that are not the character page. The
+/// room is the character's; everywhere else is text to read, so the same
+/// picture appears softened and without him rather than as a live scene.
+const backdropVeil = Color(0xD9FAF7EF);
+
+/// Swatches for the earned looks, mirroring the tints the room installs in
+/// `unity/Assets/Companion/Runtime/RobertAvatarPresentation.cs`. The Unity
+/// project renders in gamma space, so these are the same values the character
+/// is actually recoloured with rather than an approximation of them.
+///
+/// `default` is absent on purpose: it restores the model's own colours, and a
+/// swatch would claim a single colour the character does not have.
+const cosmeticSwatches = {
+  'sunset': Color(0xFFED8F5C),
+  'dune': Color(0xFFF2DBAD),
+  'midnight': Color(0xFF5C9E9E),
+};
 
 ThemeData companionTheme() => ThemeData(
       useMaterial3: true,

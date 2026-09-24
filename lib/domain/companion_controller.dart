@@ -42,13 +42,32 @@ class CompanionController extends ChangeNotifier {
   String? _conversationKey;
   String? _deletionKey;
   final String _completionKey = DemoApi.newKey();
-  final String _equipmentKey = DemoApi.newKey();
+
+  /// One stable key per look per action. Sharing a key across looks would make
+  /// the service answer a second look with the first one's recorded result, so
+  /// a retry reuses its own key and nothing else does.
+  final Map<String, String> _claimKeys = {};
+  final Map<String, String> _equipKeys = {};
   bool _disposed = false;
 
   bool get canRetryQuestion => _pendingText != null;
   bool get hasConversation => _conversationId != null;
   Lesson get orientation =>
       lessons.isEmpty ? offlineLessons.first : lessons.first;
+
+  /// The look the service last reported as worn, or null when the inventory
+  /// has not been read. Never assumed from a local action.
+  String? get equippedCosmeticId {
+    for (final cosmetic in cosmetics) {
+      if (cosmetic.equipped) return cosmetic.id;
+    }
+    return null;
+  }
+
+  /// True when the balance the service reported covers this look's price.
+  /// A null balance is not "affordable"; it is "unknown".
+  bool canAfford(Cosmetic cosmetic) =>
+      balance != null && balance! >= cosmetic.cost;
 
   void _changed() {
     if (!_disposed) notifyListeners();
@@ -123,16 +142,40 @@ class CompanionController extends ChangeNotifier {
     return celebrated;
   }
 
-  Future<bool> equipDefault() async {
+  /// Earns a look by spending server-owned stars. Returns true only once the
+  /// service has recorded the purchase; nothing is unlocked on this device.
+  Future<bool> claimCosmetic(Cosmetic cosmetic) async {
     var confirmed = false;
     await _operate(() async {
       if (!connected) {
         throw const DemoApiException(
             'Connect to confirm your development inventory.');
       }
-      await api.equipDefault(_equipmentKey);
+      final key = _claimKeys[cosmetic.id] ??= DemoApi.newKey();
+      await api.claimCosmetic(cosmetic.id, key);
+      // Re-read rather than adjusting a local balance: the service decides what
+      // was spent and what is left.
+      await _refresh();
       confirmed = true;
-      notice = 'Robert Original confirmed by the service.';
+      notice = '${cosmetic.name} earned.';
+    });
+    return confirmed;
+  }
+
+  /// Wears an earned look. Returns true only after the service confirms the
+  /// write, which is what allows the room to be told about it.
+  Future<bool> equipCosmetic(Cosmetic cosmetic) async {
+    var confirmed = false;
+    await _operate(() async {
+      if (!connected) {
+        throw const DemoApiException(
+            'Connect to confirm your development inventory.');
+      }
+      final key = _equipKeys[cosmetic.id] ??= DemoApi.newKey();
+      await api.equipCosmetic(cosmetic.id, key);
+      await _refresh();
+      confirmed = true;
+      notice = '${cosmetic.name} confirmed by the service.';
     });
     return confirmed;
   }

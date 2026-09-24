@@ -5,6 +5,12 @@ coverage/
 .idea/
 *.iml
 android/local.properties
+# Kotlin's incremental build state, written beside the Gradle project.
+android/.kotlin/
+# JVM crash dumps: Gradle leaves these at the repo root when it runs out of
+# memory, and one was committed by accident.
+hs_err_pid*.log
+replay_pid*.log
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
 .env

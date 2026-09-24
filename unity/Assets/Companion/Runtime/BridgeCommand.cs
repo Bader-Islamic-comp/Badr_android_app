@@ -25,7 +25,16 @@ namespace Companion.Presentation
         private static readonly string[] Animations = { "Idle", "Wave", "Nod", "Celebrate" };
         private static readonly string[] Emotions = { "neutral", "happy", "surprised" };
         private const string Character = "robert";
-        private const string DefaultCosmetic = "default";
+
+        /// <summary>
+        /// Every look the room can install. The catalogue is fixed in the
+        /// build: the bridge grants no ownership and invents no look, so an
+        /// id the room was not shipped with is rejected here rather than
+        /// reaching the presentation layer.
+        /// </summary>
+        public static readonly string[] Cosmetics = {
+            "default", "sunset", "dune", "midnight"
+        };
 
         private readonly string messageId;
         private readonly string type;
@@ -138,7 +147,7 @@ namespace Companion.Presentation
 
             if (commandType == "avatar.set_cosmetics")
             {
-                string value = SingleString(payload, "cosmeticId", new string[] { DefaultCosmetic });
+                string value = SingleString(payload, "cosmeticId", Cosmetics);
                 if (value == null) return null;
                 return new BridgeCommand(id.Text, commandType, parsedSequence, null, null, value, null);
             }

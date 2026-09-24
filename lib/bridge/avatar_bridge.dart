@@ -21,7 +21,7 @@ class AvatarBridge extends ChangeNotifier {
     MethodChannel? commands,
     EventChannel? events,
     this.timeout = const Duration(seconds: 3),
-    this.surfaceTimeout = const Duration(seconds: 20),
+    this.startupTimeout = const Duration(seconds: 30),
     this.reactionSpacing = const Duration(milliseconds: 1200),
   })  : _commands = commands ?? const MethodChannel('companion/unity_commands'),
         _events = events ?? const EventChannel('companion/unity_events');
@@ -30,13 +30,18 @@ class AvatarBridge extends ChangeNotifier {
   final EventChannel _events;
   final Duration timeout;
 
-  /// Deadline for [probeSurface] alone.
+  /// Deadline for the two calls that wait on the engine starting, rather than
+  /// on a room that is already running: [probeSurface] and the initialization
+  /// handshake.
   ///
-  /// That query waits on the host constructing the engine, which on a slow or
-  /// memory-pressured device takes far longer than an ordinary bridge message.
-  /// Using [timeout] for it reports "no room" on exactly the devices least able
-  /// to afford losing one.
-  final Duration surfaceTimeout;
+  /// Both wait on the host constructing the Unity engine and loading the scene,
+  /// which takes many seconds — around nine on the development emulator — where
+  /// an ordinary bridge message takes milliseconds. Using [timeout] for them
+  /// reports "no room" on exactly the devices least able to afford losing one,
+  /// and it did: the handshake deadlined before the engine had finished
+  /// starting on every single launch, so the room rendered and the bridge never
+  /// connected.
+  final Duration startupTimeout;
 
   /// Minimum gap between queued reactions, so a burst of taps cannot turn into
   /// continuous motion.
@@ -73,6 +78,14 @@ class AvatarBridge extends ChangeNotifier {
     'app.pause',
     'app.resume',
   };
+
+  /// Looks the room was built with.
+  ///
+  /// The room carries its own copy of this list and installs nothing outside
+  /// it. Checking here too means an id the service invented is dropped before
+  /// it reaches the native boundary, rather than tearing the room down on a
+  /// rejection.
+  static const cosmetics = {'default', 'sunset', 'dune', 'midnight'};
 
   /// A burst of taps must not become an animation backlog.
   static const reactionQueueLimit = 3;
@@ -183,8 +196,9 @@ class AvatarBridge extends ChangeNotifier {
             'characterId': 'robert',
             'capabilities': supported.toList(),
           },
-          acknowledgement: true);
-      final negotiated = await _wait(ready.future);
+          acknowledgement: true,
+          deadline: startupTimeout);
+      final negotiated = await _wait(ready.future, deadline: startupTimeout);
       if (!_disposed &&
           accepted &&
           negotiated &&
@@ -235,8 +249,10 @@ class AvatarBridge extends ChangeNotifier {
     }
   }
 
+  /// [deadline] overrides [timeout] for the one exchange that waits on the
+  /// engine starting rather than on a room that is already answering.
   Future<bool> _send(String type, Map<String, dynamic> payload,
-      {bool acknowledgement = false}) async {
+      {bool acknowledgement = false, Duration? deadline}) async {
     if (_disposed) return false;
     if (type != 'avatar.initialize' &&
         (status != AvatarStatus.ready || !_capabilities.contains(type))) {
@@ -246,22 +262,25 @@ class AvatarBridge extends ChangeNotifier {
     final completer = acknowledgement ? Completer<bool>() : null;
     if (completer != null) _pending[id] = completer;
     try {
-      final delivered = await _wait(_commands
-          .invokeMethod<void>(
-              'sendMessage',
-              jsonEncode({
-                'schemaVersion': 1,
-                'messageId': id,
-                'sequence': _sequence++,
-                'type': type,
-                'payload': payload,
-              }))
-          .then((_) => true));
+      final delivered = await _wait(
+          _commands
+              .invokeMethod<void>(
+                  'sendMessage',
+                  jsonEncode({
+                    'schemaVersion': 1,
+                    'messageId': id,
+                    'sequence': _sequence++,
+                    'type': type,
+                    'payload': payload,
+                  }))
+              .then((_) => true),
+          deadline: deadline);
       if (!delivered) {
         _fallback();
         return false;
       }
-      return completer == null || await _wait(completer.future);
+      return completer == null ||
+          await _wait(completer.future, deadline: deadline);
     } catch (_) {
       _fallback();
       return false;
@@ -285,7 +304,7 @@ class AvatarBridge extends ChangeNotifier {
               .invokeMethod<bool>('roomSurface')
               .then((value) => value ?? false),
           requireReady: false,
-          deadline: surfaceTimeout);
+          deadline: startupTimeout);
     } catch (_) {
       return false;
     }
@@ -305,9 +324,13 @@ class AvatarBridge extends ChangeNotifier {
   }
 
   /// Caller must first confirm the server-owned inventory and equipment write.
-  Future<bool> applyServerConfirmedDefault() async {
+  ///
+  /// A look this build does not ship is refused without touching the room:
+  /// the room is not broken, it simply has nothing to install.
+  Future<bool> applyServerConfirmedCosmetic(String cosmeticId) async {
+    if (!cosmetics.contains(cosmeticId)) return false;
     final result = await _send(
-        'avatar.set_cosmetics', {'cosmeticId': 'default'},
+        'avatar.set_cosmetics', {'cosmeticId': cosmeticId},
         acknowledgement: true);
     if (!result) _fallback();
     return result;

@@ -5,6 +5,8 @@ import 'package:companion_mobile/bridge/avatar_room.dart';
 import 'package:companion_mobile/data/demo_api.dart';
 import 'package:companion_mobile/domain/companion_controller.dart';
 import 'package:companion_mobile/main.dart';
+import 'package:companion_mobile/ui/character_stage.dart';
+import 'package:companion_mobile/ui/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -47,8 +49,28 @@ const _inventory = {
       'id': 'default',
       'characterId': 'robert',
       'name': 'Robert Original',
+      'description': 'The appearance Robert arrives in.',
+      'cost': 0,
       'owned': true,
       'equipped': true,
+    },
+    {
+      'id': 'sunset',
+      'characterId': 'robert',
+      'name': 'Sunset Copper',
+      'description': 'Warm copper, the colour of the room at dusk.',
+      'cost': 5,
+      'owned': false,
+      'equipped': false,
+    },
+    {
+      'id': 'dune',
+      'characterId': 'robert',
+      'name': 'Dune Walker',
+      'description': 'Pale desert sand that catches the low sun.',
+      'cost': 15,
+      'owned': false,
+      'equipped': false,
     }
   ]
 };
@@ -64,18 +86,32 @@ void main() {
     await tester.pumpWidget(const CompanionApp());
     await tester.pumpAndSettle();
 
-    // Character-first main page with no native host: the handshake is honest
-    // about looking for a room, then falls back for good once it deadlines.
-    expect(find.text('Looking for the character room…'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle();
-    expect(find.text('Robert · static preview'), findsOneWidget);
-    expect(find.text('Hello, explorer.'), findsOneWidget);
+    // The character page carries the character and the composer, and nothing
+    // else at all: no title bar, no banner, no greeting card, no room status,
+    // and no orientation, connection or balance.
     expect(find.byTooltip('Send test question'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('Let’s explore'));
+    for (final absent in [
+      'little steps',
+      'Looking for the character room…',
+      'Robert · static preview',
+      'Hello, explorer.',
+      'Let’s explore',
+      'Exploring offline',
+    ]) {
+      expect(find.text(absent), findsNothing,
+          reason: 'the character page does not carry it');
+    }
+    expect(find.byType(DevelopmentBanner), findsNothing);
+    // Past the startup deadline: with no host the handshake waits for an
+    // engine that is never going to start.
+    await tester.pump(const Duration(seconds: 31));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Let’s explore'));
+
+    await tester.tap(find.text('Learn'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Start orientation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start orientation'));
     await tester.pumpAndSettle();
     expect(find.text('Choose a comfortable place to learn.'), findsOneWidget);
     // The composer belongs to the character page only.
@@ -96,6 +132,10 @@ void main() {
     expect(find.text('Connect to view your server-owned demo balance.'),
         findsOneWidget);
     expect(find.text('5 learning stars'), findsNothing);
+    // The chrome the character page gave up is still here, so the operator
+    // notice and the parent entry are never more than one tap away.
+    expect(find.byType(DevelopmentBanner), findsOneWidget);
+    expect(find.text('little steps'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -117,9 +157,11 @@ void main() {
             label: 'Say hello to Robert',
             hint: 'Robert gives a short wave or nod'));
 
-    await tester.ensureVisible(find.text('Let’s explore'));
+    await tester.tap(find.text('Learn'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Let’s explore'));
+    await tester.ensureVisible(find.text('Start orientation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start orientation'));
     await tester.pumpAndSettle();
 
     // A previous browser check found these controls missing from the
@@ -156,9 +198,14 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(const CompanionApp());
     await tester.pumpAndSettle();
-    expect(find.byType(ListView), findsOneWidget);
     // Readable text and a reachable composer take priority over the character.
     expect(find.byTooltip('Send test question'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // The content pages are the ones that have to scroll at this size.
+    await tester.tap(find.text('Learn'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ListView), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byTooltip('Parent area'));
@@ -167,6 +214,10 @@ void main() {
     expect(find.textContaining('not an authenticated parental gate'),
         findsOneWidget);
     expect(find.text('Character motion'), findsOneWidget);
+    // The room's own state moved here off the character page. Its wording
+    // tracks the handshake, so assert the line that is always there.
+    expect(find.textContaining('Learning and chat do not depend on the room'),
+        findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -264,11 +315,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
         isNot(Colors.transparent));
-    expect(find.text('Robert · static preview'), findsNothing,
-        reason: 'the handshake is still in flight at this point');
-    await tester.pump(const Duration(seconds: 4));
+    // Past the startup deadline: with no host the handshake waits for an
+    // engine that is never going to start.
+    await tester.pump(const Duration(seconds: 31));
     await tester.pumpAndSettle();
-    expect(find.text('Robert · static preview'), findsOneWidget);
+    expect(
+        tester
+            .widget<CharacterStage>(find.byType(CharacterStage))
+            .surfaceAttached,
+        isFalse,
+        reason: 'no host, so the stage shows its own static card');
 
     // A composited surface makes the page full bleed, and the static preview
     // gives way to a transparent window onto the live room.
@@ -297,8 +353,137 @@ void main() {
     expect(room.surfaceAttached, isTrue);
     expect(tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
         Colors.transparent);
-    expect(find.text('Robert · static preview'), findsNothing,
+    expect(
+        tester
+            .widget<CharacterStage>(find.byType(CharacterStage))
+            .surfaceAttached,
+        isTrue,
         reason: 'the live room replaces the static card');
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+      'a look reaches the character room only after the service '
+      'confirms it', (tester) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var owned = false;
+    var wearing = 'default';
+    Map<String, Object> look(
+            String id, String name, int cost, bool isOwned, bool equipped) =>
+        {
+          'id': id,
+          'characterId': 'robert',
+          'name': name,
+          'description': 'A synthetic look.',
+          'cost': cost,
+          'owned': isOwned,
+          'equipped': equipped,
+        };
+    final model = CompanionController(DemoApi(
+      const DemoConfig(
+          baseUrl: 'http://localhost:8000', token: 'synthetic-token'),
+      client: MockClient((request) async {
+        switch (request.url.path) {
+          case '/v1/bootstrap':
+            return http.Response(
+                jsonEncode({
+                  'mode': 'development',
+                  'characterId': 'robert',
+                  'profileId': 'demo-child',
+                  'contentStatus': 'awaiting_review',
+                  'features': {
+                    'voice': false,
+                    'generativeAnswers': false,
+                    'unity': false
+                  },
+                }),
+                200);
+          case '/v1/lessons':
+            return http.Response(jsonEncode(_lessons), 200);
+          case '/v1/rewards':
+            return http.Response(
+                jsonEncode(
+                    {'balance': owned ? 0 : 5, 'unit': 'learning_stars'}),
+                200);
+          case '/v1/challenges/today':
+            return http.Response(jsonEncode(_challenges(true)), 200);
+          case '/v1/inventory':
+            return http.Response(
+                jsonEncode({
+                  'items': [
+                    look('default', 'Robert Original', 0, true,
+                        wearing == 'default'),
+                    look('sunset', 'Sunset Copper', 5, owned,
+                        wearing == 'sunset'),
+                  ]
+                }),
+                200);
+          case '/v1/cosmetics/claim':
+            owned = true;
+            return http.Response(
+                '{"cosmeticId":"sunset","owned":true,"spent":5,"balance":0}',
+                200);
+          case '/v1/equipped-cosmetics':
+            wearing = 'sunset';
+            return http.Response(
+                '{"cosmeticId":"sunset","characterId":"robert"}', 200);
+          default:
+            return http.Response('{}', 404);
+        }
+      }),
+    ));
+    final host = FakeUnityHost('test/looks')..install();
+    addTearDown(host.remove);
+    final room = AvatarRoom(
+      commands: host.commands,
+      create: () => AvatarBridge(
+          commands: host.commands,
+          events: host.events,
+          timeout: const Duration(seconds: 30)),
+    );
+    addTearDown(room.dispose);
+
+    await tester.pumpWidget(CompanionApp(controller: model, room: room));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Style'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.text('Connect development service'), 200);
+    await tester.tap(find.text('Connect development service'));
+    await tester.pumpAndSettle();
+
+    // The look can only reach the room if the room negotiated one at all.
+    expect(room.status, AvatarStatus.ready);
+
+    // Connecting restores what the service says is worn, without a tap: that
+    // is also what puts an earned look back on the character after a relaunch.
+    expect(host.looks, ['default']);
+
+    await tester.scrollUntilVisible(find.text('Sunset Copper'), -200);
+    expect(find.text('Ready to earn for 5 stars.'), findsOneWidget);
+
+    await tester.tap(find.text('Earn for 5 stars'));
+    await tester.pumpAndSettle();
+    expect(find.text('Earned · confirmed by the service.'), findsOneWidget);
+    // Earning is not wearing: the room has heard nothing new.
+    expect(host.looks, ['default']);
+
+    await tester.tap(find.text('Wear this look'));
+    await tester.pumpAndSettle();
+    // The equip write and the acknowledgement it waits for are platform round
+    // trips; flush them without advancing the clock past the bridge deadline.
+    for (var flush = 0; flush < 8; flush++) {
+      await tester.pump();
+    }
+    expect(host.looks, ['default', 'sunset']);
+    expect(find.text('Robert is wearing this.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
   });
 }

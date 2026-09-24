@@ -224,6 +224,7 @@ GET    /v1/challenges/today
 POST   /v1/challenges/{id}/progress-events
 GET    /v1/rewards
 GET    /v1/inventory
+POST   /v1/cosmetics/claim
 PUT    /v1/equipped-cosmetics
 
 POST   /v1/admin/sources
