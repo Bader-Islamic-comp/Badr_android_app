@@ -156,9 +156,16 @@ be rendered in the hope that it is right.
   in 1 s, a ruling redirect in 4 ms, and an abstention for a question the
   corpus cannot answer. See the paired `comp-server/CHANGELOG.md` entry.
 
-Still not done: nobody has seen the new bubble on the emulator or a device.
-The development machine's memory commit limit did not leave room for the
-emulator while Qwen3.5-9B was loaded. The corpus is synthetic help
+- **On the Android 16 x86_64 emulator**, against the live API with Qwen3.5-9B
+  generating (once Steam and Chrome were closed to free memory for both): the
+  thinking bubble, a grounded reply with its "Sources" list, and a ruling
+  redirect labelled "Let’s ask a grown-up" all rendered as designed. See
+  `design/thinking-bubble.png`, `design/grounded-answer.png` and
+  `design/redirect-reply.png`. The first try surfaced a verifier issue on the
+  server (Qwen sometimes cites once after two sentences), now fixed as
+  `grounding-v2`; see `comp-server/CHANGELOG.md`.
+
+Still not done: no physical device has run the new bubble. The corpus is synthetic help
 text about using the app, not religious teaching, and it has not been reviewed
 for children.
 

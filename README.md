@@ -19,7 +19,7 @@ implemented.
 |---|---|
 | `lib/` | Application source: `bridge/`, `data/`, `domain/`, `ui/` |
 | `assets/` | Runtime assets only — the static preview, the shared room backdrop and the Robert character package |
-| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus `room-on-device.png` and `customization-tab.png` from the emulator |
+| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus `room-on-device.png`, `customization-tab.png`, `thinking-bubble.png`, `grounded-answer.png` and `redirect-reply.png` from the emulator |
 | `unity/` | The Unity character-room project, its room builder and its test scripts |
 | `archive/` | Untracked: superseded character revisions and the packaged distributable |
 | `contracts/` | Versioned API and bridge schemas shared with `comp-server` |
@@ -336,10 +336,12 @@ answers on, a release built with the offline hashing embedder, and a local
 stand-in for the Qwen server, with no model downloaded. The app parsed all five
 answer types that such a server returns, and clearing worked. The same client
 code then ran against the live API with the real Qwen3.5-9B generating, and
-parsed grounded replies with sources in about 2 s. One check is still missing:
-nobody has seen the new reply bubble on the emulator or a device (the
-development machine could not hold the emulator and the loaded model at once).
-At 320×380 with text
+parsed grounded replies with sources in about 2 s. On the emulator, with Qwen
+generating, the thinking bubble, a grounded reply with its sources and a ruling
+redirect all rendered as designed (`design/thinking-bubble.png`,
+`design/grounded-answer.png`, `design/redirect-reply.png`); the emulator and the
+loaded model only fit in memory together once Steam and Chrome were closed. No
+physical device has run it yet. At 320×380 with text
 at 2×, the composer's hint wraps and leaves the reply about 64 px.
 
 A browser check of the built web preview previously found the orientation
