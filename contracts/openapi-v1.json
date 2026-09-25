@@ -386,12 +386,13 @@
             "type": "string"
           },
           "reference": {
-            "maxLength": 500,
+            "maxLength": 160,
+            "minLength": 1,
             "title": "Reference",
             "type": "string"
           },
           "title": {
-            "maxLength": 500,
+            "maxLength": 120,
             "minLength": 1,
             "title": "Title",
             "type": "string"

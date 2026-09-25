@@ -47,7 +47,9 @@ by loosening a client check.
 
 **Talk carries the character, the composer and nothing else.** The last answer
 sits in a single bubble just above the composer; with no answer yet the page is
-just Robert. Earlier answers are not kept. Everything else moved to where it
+just Robert. The bubble says where the answer came from. While Robert is
+thinking, it says that instead (see [Grounded answers](#grounded-answers)).
+Earlier answers are not kept. Everything else moved to where it
 belongs — the orientation prompt to Learn, the service connection to Quests,
 Style and the parent area, and the room's own state and its retry to the parent
 area, because how the renderer is doing is developer state and does not belong
@@ -142,7 +144,7 @@ The SDK is **vendored, not installed**: it lives beside the repositories at
 resolve. Put it on `PATH` for the session first, or call it by full path.
 
 ```powershell
-$env:Path = "$HOME\Desktop\comp\.toolslutterin;$env:Path"
+$env:Path = "$HOME\Desktop\comp\.tools\flutter\bin;$env:Path"
 ```
 
 ```powershell
@@ -217,9 +219,10 @@ authentication.
 Connection is user initiated from the connection card on Quests, Style or the
 parent area. The bootstrap must identify the synthetic development profile,
 disabled voice and awaiting-review content. `features.generativeAnswers` is the
-one feature the service may report as on; the app records it and never turns it
-on, and the parent area shows which it is. Completion, balance, challenge state,
-lessons and inventory come from the service.
+one feature the service may report as on, and it must be a real boolean. The
+app records it and never turns it on, and the parent area shows whether it is
+on. Completion, balance, challenge state, lessons and inventory come from the
+service.
 
 Looks are earned and worn through the service, never on the device. **Style**
 shows the catalogue with its price, what is earned, what is worn and how many
@@ -236,16 +239,18 @@ gesture, the worn look comes back by itself after a relaunch or a room rebuild,
 neither of which involves a tap. Write retries reuse their
 idempotency key; question retries resume a known turn.
 
-Questions are answered on the service, never on the phone. A turn is created
-`pending` and read again every second with REST until it completes, for at most
-90 seconds per attempt; past that Robert "is taking longer than usual", and
-trying again resumes polling the same turn rather than asking twice. The shared
-SSE endpoint is not used. A completed turn is parsed strictly against
-`comp-server/doc/rag-system.md` §7 and refused whole if it breaks a rule. The
-Talk bubble shows "Robert is looking in his library…" while waiting, then labels
-the reply by the service's answer type — only grounded and reviewed answers say
-"From Robert’s library" and list their sources, as plain text. Clearing works
-mid-wait: it stops polling, and a reply that lands afterwards is dropped.
+Questions are answered on the service, never on the phone. Fixed replies, and
+every reply while grounded answers are off, are already complete when the turn
+is created, and are read once. A turn the service is still working on comes
+back `pending`. The app then reads it again with REST every second, for at most
+90 seconds per attempt. Past that, the notice says "Robert is taking longer
+than usual. Try again." Trying again resumes polling the same turn rather than
+asking twice. The shared SSE endpoint is not used. A completed turn is parsed
+strictly against
+[`comp-server/doc/rag-system.md`](../comp-server/doc/rag-system.md) §7. If it
+breaks any rule, the whole reply is refused with a generic error that never
+echoes the service's text. Clearing works mid-wait: it stops polling, and a
+reply that lands afterwards is dropped.
 
 Question text stays only in memory during submission and retry. It is not logged
 or saved to disk. Clearing the conversation deletes the server conversation
@@ -253,18 +258,69 @@ before clearing local handles, preserving retry capability on failure. The
 service itself is an ephemeral synthetic demo; there is no real profile export
 or deletion.
 
+### Grounded answers
+
+The service can answer from a corpus release. It retrieves passages, then does
+one of two things. It may return a reviewed answer word for word. Otherwise, a
+self-hosted Qwen3.5-9B writes a reply from the passages, and the service
+releases it only if every sentence is supported by a passage it cites. This is
+development only and **off by default**. All of it runs on the service. The app
+has no model, no provider and no credential, and all it learns is whether the
+switch is on.
+
+To try it:
+
+1. Start the server with grounded answers enabled, following
+   [`../comp-server/README.md`](../comp-server/README.md). The settings are
+   listed in
+   [`comp-server/doc/rag-system.md`](../comp-server/doc/rag-system.md) §9.
+2. Connect the app as usual: the same `DEMO_API_URL` and `DEMO_API_TOKEN` as
+   above, then connect from Quests, Style or the parent area. The parent area
+   should then read "Grounded answers: on · development corpus". If it reads
+   "Grounded answers: off", the server was started without them.
+3. Ask on Talk. While the service works, the bubble says "Robert is looking in
+   his library…" next to a spinner, or a book icon under reduced motion. With
+   grounded answers off, it says "Robert is thinking…".
+
+**The corpus is synthetic app help only.** It is invented help text about using
+the app, covering stars, looks, quests, the parent area and taking a break. It
+contains no religious teaching and has not been reviewed for children. Ask
+synthetic questions about the app. Questions outside the corpus should come
+back as "Robert isn’t sure" or "Let’s ask a grown-up", not as an answer. The
+server refuses any model host that is not on the operator's machine or private
+network, so no question goes to a third-party provider.
+
+Each reply is labelled by the answer type the service sends. The app never
+infers the label from the text:
+
+| Answer type | Label | Colour |
+|---|---|---|
+| `grounded`, `reviewed_answer` | "From Robert’s library", with a Sources list | teal |
+| `abstained` | "Robert isn’t sure" | muted |
+| `redirected` | "Let’s ask a grown-up" | orange |
+| `safety` | "You can talk to a grown-up you trust" | ink |
+| `unavailable` (grounded answers off) | "Service response" | teal |
+
+Only library replies carry sources. Each one appears under the text as a title
+with its reference beneath, in plain text, because there is nothing on the
+phone to open. A reply of any other type that carries sources is refused. The
+labels stay calm, because not being sure, or being pointed to a grown-up, is
+not a mistake the child made. The safety label uses the steady ink colour
+rather than an alert colour. A long reply opens at its first sentence, and the
+sources are further down.
+
 ## Verification coverage and remaining work
 
 The 81-test suite covers no-network default mode, server-owned rewards, ownership
-rejection, idempotent completion headers, resuming known question turns,
-polling a pending turn to its deadline and resuming it, every turn-contract
-rule, clearing and disposal mid-wait, the reply labels and sources,
-sanitized failures, missing native host, malformed bridge events, cancellation of
-native deadlines on disposal, asynchronous send/delete disposal, offline
-orientation, 320px/large-text layout, the character-page visibility and
-foreground policy, reduced motion, the bounded reaction queue, coordinated room
-recreation and its bound, and activatable button semantics for the orientation
-controls.
+rejection, idempotent completion headers, resuming known question turns, the
+bootstrap's grounded-answers flag, polling a pending turn to its deadline and
+resuming it, every turn-contract rule, clearing and disposal mid-wait, the reply
+labels and sources, sanitized failures, missing native host, malformed bridge
+events, cancellation of native deadlines on disposal, asynchronous send/delete
+disposal, offline orientation, 320px/large-text layout, the character-page
+visibility and foreground policy, reduced motion, the bounded reaction queue,
+coordinated room recreation and its bound, and activatable button semantics for
+the orientation controls.
 
 Five of those tests cover the customization tab specifically: that a look is
 earned from the service rather than granted on the device, that the balance is
@@ -273,6 +329,15 @@ wears nothing, that a claim whose response names a different look is a failure
 rather than an unlock, and — end to end through a fake Unity host — that
 `avatar.set_cosmetics` reaches the room only after the equipment write is
 confirmed, and never on the claim alone.
+
+Grounded replies have also been checked across both repositories. The real
+`CompanionController` and `DemoApi` ran against the real server with grounded
+answers on, a release built with the offline hashing embedder, and a local
+stand-in for the Qwen server, with no model downloaded. The app parsed all five
+answer types that such a server returns, and clearing worked. Two checks are
+still missing: nobody has seen the new reply bubble on the emulator or a
+device, and no reply from the real model has been parsed. At 320×380 with text
+at 2×, the composer's hint wraps and leaves the reply about 64 px.
 
 A browser check of the built web preview previously found the orientation
 buttons missing from the accessibility tree. They are now exposed as buttons

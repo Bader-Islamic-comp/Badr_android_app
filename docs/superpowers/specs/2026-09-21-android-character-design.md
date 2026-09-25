@@ -42,6 +42,8 @@ Flutter submits text through the existing versioned API with stable idempotency 
 
 The current API has no approved AI-generated cue contract. This presentation increment uses local deterministic interaction cues and the existing fixed backend reply. Future provider-enabled responses require explicitly versioned and validated cues; never execute model-generated commands directly.
 
+*Status, 2026-09-25:* every backend reply now carries one of six answer types, and the old fixed reply is the `unavailable` type. With the backend's development-only grounded answers switched on, a reply can come from Robert's library and list its sources. Cues are still local and deterministic, and no cue contract was added. See **Implementation status**.
+
 Network loss preserves local character presentation but never produces an offline AI answer. Preserve retry behavior and honest unavailable states. Consent, progress, rewards and inventory remain server-authoritative.
 
 ## Exclusions
@@ -64,7 +66,7 @@ Review this design before creating the implementation plan. The plan will separa
 
 ## Implementation status
 
-First recorded 2026-09-21, updated 2026-09-22. This records what exists, not
+First recorded 2026-09-21, updated 2026-09-25. This records what exists, not
 what is approved. `comp-mobile/CHANGELOG.md` has the increment-by-increment log.
 
 ### Implemented and verified in this environment
@@ -82,6 +84,21 @@ what is approved. `comp-mobile/CHANGELOG.md` has the increment-by-increment log.
   header and the adult-operator notice are off this page and on the other three,
   so the balance, the parent entry and the notice stay one tap away. Clearing
   stays beside the reply because it deletes the server conversation.
+- The reply bubble is labelled by the service's answer type:
+  - "From Robert’s library" for `grounded` and `reviewed_answer`, with a
+    plain-text Sources list (each source's title, then its reference)
+  - "Robert isn’t sure" for `abstained`
+  - "Let’s ask a grown-up" for `redirected`
+  - "You can talk to a grown-up you trust" for `safety`
+  - "Service response" for `unavailable`
+
+  While the service works, a thinking bubble says "Robert is looking in his
+  library…" and stays clearable, and a long reply opens at its first sentence.
+  Replies are parsed strictly against `comp-server/doc/rag-system.md` §7 and
+  refused whole if they break any rule. Unity still receives no reply text.
+  This is covered by Flutter tests and by a live run against the real server
+  with a stand-in model. It has not yet been seen on the emulator or run
+  against the real Qwen3.5-9B.
 - The character appears on the character page only. The other pages are backed
   by the room's own backdrop image without him, so they read as the same place
   and look identical with or without a Unity room.
@@ -184,7 +201,8 @@ exists, feeding it the `unity.*` properties from the export's own
 6. TalkBack, keyboard insets, large text, orientation, back navigation —
    **partial.** Large text and a 320px viewport are tested, and the orientation
    buttons are now in the accessibility tree. TalkBack, real keyboard insets and
-   rotation need a device.
+   rotation need a device. At 320×380 with text at 2×, the composer's hint
+   wraps and leaves the reply about 64 px.
 7. Startup, memory, frame time and package size — **partial.** The release APK
    is 49.3 MB without a Unity export; the debug APK with the x86_64 export is
    125 MB, which is a debug, single-ABI number and not a shipping size. Startup,

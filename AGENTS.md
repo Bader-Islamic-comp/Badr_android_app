@@ -75,6 +75,7 @@ Every child message must pass through server-side input safety and routing befor
 - Buffer and validate complete sentences or semantic segments before streaming. Never expose raw token-by-token model output to a child.
 - Abstain gently when evidence is insufficient and recommend asking a parent, teacher, or qualified local scholar as appropriate.
 - Record model, prompt-policy, retriever, and corpus versions without placing raw child content in ordinary logs.
+- The development RAG implementation lives in the backend and follows `comp-server/doc/rag-system.md` within the boundary of ADR 0003 (`comp-server/doc/adr-0003-grounded-answers-development.md`). The backend's `corpus/dev-app-help` must stay synthetic app help; never add religious content to it.
 
 Do not silently switch to an unreviewed model or speech provider. Provider additions require privacy, retention, training-use, residency, safety, and evaluation review.
 

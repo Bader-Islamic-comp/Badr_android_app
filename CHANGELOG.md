@@ -6,6 +6,164 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-09-25
+
+Branch `feature/rag-system-and-data-pipeline`. The service can now answer a
+question from a corpus release. This is development only and off by default.
+The Talk page shows those answers and says where they came from. Retrieval,
+generation (a self-hosted Qwen3.5-9B) and verification all stay on the service.
+The app gains no model, no provider and no credential; all it learns is whether
+the switch is on. The paired server entry is in `comp-server/CHANGELOG.md`. The
+design is `comp-server/doc/rag-system.md`, and its §7 is the contract this
+client parses against.
+
+### Connecting
+
+- **`DemoApi.bootstrap()` now accepts a service with
+  `features.generativeAnswers` on, and returns the flag.** It used to refuse
+  such a service. The flag must be a real boolean: a string `"true"` or a missing flag describes a service this build
+  was not made for. Every other check is as strict as before. Voice on, another
+  mode, character or profile, or published content still refuses the service.
+- `CompanionController.groundedAnswers` records the flag. It is false whenever
+  nothing is connected. The app never turns it on, because whether a model
+  answers is the service's decision.
+
+### Waiting for a reply
+
+- **`ask()` handles a `pending` turn.** A turn the service is still working on
+  is read again with `GET /v1/turns/{id}` every second, for at most 90 seconds
+  per attempt. Fixed replies, and every reply while grounded answers are off,
+  are already complete when the turn is created, so they are read once with no
+  waiting.
+- **Past the deadline the question is paused, not lost.** The notice says
+  "Robert is taking longer than usual. Try again." The question, its idempotency
+  key and its turn id are all kept, so a retry resumes polling the same turn
+  with no second `POST`. The service answers one question at a time and queues
+  the rest, so a slow reply does not mean the question failed.
+- **Clearing works mid-wait.** `clearConversation` stops the wait immediately
+  rather than at the next read, then deletes the conversation. A reply that
+  lands in between is dropped, not shown after the child asked for it to go. If
+  the delete fails, the question is held for retry, as after any other failure.
+- Disposing the controller mid-wait also stops polling, and it sends no
+  notifications after dispose.
+- The poll interval, the deadline, the wait and the clock are injectable, so
+  tests can poll without real timers. A real delay under the widget tester's
+  fake clock never finishes.
+
+### Parsing a reply
+
+`Reply.fromTurn` replaces the bare `answer` string. It enforces every rule of
+§7 and refuses the whole payload if any rule is broken, rather than showing
+part of it. This is the text a child reads and the provenance a parent relies
+on. A library reply without sources, or a fixed reply with some, should never
+be rendered in the hope that it is right.
+
+- `answerType` must be one of `unavailable`, `grounded`, `reviewed_answer`,
+  `abstained`, `redirected` or `safety`.
+- The library types, `grounded` and `reviewed_answer`, carry 1–4 sources whose
+  ids match the citations one for one, in order. Every other type carries none,
+  so no other reply can borrow the library's authority.
+- Chunk ids must match `^[a-z0-9][a-z0-9-]{1,63}#[1-9][0-9]{0,3}$`, and no id
+  may appear twice.
+- Text is 1–1,200 characters and not blank. It is counted in runes, as the
+  service counts it, so a reply at the limit that uses characters outside the
+  basic plane is not refused as too long on this side.
+- A leftover `[n]` marker is refused. The service strips the markers once it
+  has checked them, so one that survives means the text is not the verified
+  release.
+- Source titles are at most 120 characters and references at most 160.
+- A pending turn must have a null `answerType`, and the `turnId` must be the one
+  asked for. An unknown status is refused, whether it arrives when the turn is
+  created or on a later read.
+- Errors are generic ("The service returned an unexpected reply.") and never
+  echo what the service sent.
+
+### The Talk page
+
+- **Each reply is labelled by the service's answer type**, in 13 px bold
+  sentence case. This replaces the old upper-case "SERVICE RESPONSE" that
+  appeared on every reply.
+
+  | Answer type | Label | Colour |
+  |---|---|---|
+  | `grounded`, `reviewed_answer` | "From Robert’s library" | teal |
+  | `abstained` | "Robert isn’t sure" | muted |
+  | `redirected` | "Let’s ask a grown-up" | orange |
+  | `safety` | "You can talk to a grown-up you trust" | ink |
+  | `unavailable` | "Service response" | teal |
+
+  The wording stays calm for every type, because not being sure, or being
+  pointed to a grown-up, is not a mistake the child made. The safety label uses
+  the steady ink colour, not an alert colour, so it does not alarm.
+- **Library replies list their sources** under the text: a "Sources" heading,
+  then each source's title with its reference beneath it in muted text. They
+  are plain text, not links, because there is nothing on the phone to open.
+- **A thinking bubble** replaces the reply while Robert is working. It says
+  "Robert is looking in his library…", or "Robert is thinking…" when grounded
+  answers are off, next to a spinner, or a book icon under reduced motion. It
+  is a live region. The × stays usable, so a child does not have to wait out a
+  slow answer to take the question back.
+- **A long reply now scrolls from its beginning.** It used to open at its end.
+  A reply can be 1,200 characters with four sources underneath, and a child
+  should land on the first sentence, not on the sources.
+- The progress bar at the top of the page is hidden on Talk while Robert is
+  thinking, because the bubble already says so.
+
+### The parent area
+
+- A new row reports the service's switch but offers no way to change it:
+  - on: "Grounded answers: on · development corpus", with the subtitle "Answers
+    come only from the service’s development library and show their sources.
+    The model runs on the service, never on this phone."
+  - off: "Grounded answers: off", with the subtitle "No AI model answers
+    questions."
+- "Content awaits review" no longer says that no AI provider is enabled. The
+  new row now covers that.
+
+### Contracts
+
+- `contracts/openapi-v1.json` was regenerated from the server and is
+  byte-identical to `comp-server/contracts/openapi-v1.json`. The changes:
+  - `Turn` gains `answerType` and `sources`, using a new `Source` schema.
+  - `status` on `Turn` and `TurnCreated` may now be `pending`.
+  - Citations and sources are capped at four, and text at 1,200 characters.
+  - `Features.generativeAnswers` is no longer `const: false`.
+
+### Verification
+
+- Flutter: 33 → **81 tests**, analysis clean. The new tests cover:
+  - the bootstrap flag and each way it is refused
+  - a turn completed at creation being read once
+  - polling a pending turn every interval, the deadline, and resuming the same
+    turn with no second `POST`
+  - each contract rule above, one test per rule, plus rune counting
+  - clearing and disposing mid-wait, including a reply that lands after the
+    clear
+  - on the page: the thinking bubble followed by a library reply with its
+    sources
+  - clearing from the bubble while Robert is thinking
+  - each non-library reply type's label, with no sources shown
+  - a long library reply on a small screen starting at its beginning
+- **Live run across both repositories.** The real `CompanionController` and
+  `DemoApi` ran against the real server with grounded answers on, a release
+  built with the offline hashing embedder, and a local stand-in for the Qwen
+  server, with no model downloaded. All five answer types that such a server
+  returns (`grounded`, `reviewed_answer`, `abstained`, `redirected`, `safety`)
+  parsed correctly, and clearing worked.
+
+Still not done: nobody has seen the new bubble on the emulator or a device, and
+no reply from the real Qwen3.5-9B has been parsed. The corpus is synthetic help
+text about using the app, not religious teaching, and it has not been reviewed
+for children.
+
+Known issues:
+- **Pre-existing:** at 320×380 with text at 2×, the composer's hint wraps and
+  leaves the reply about 64 px.
+- **Source limits now match** (resolved before commit). The server's schema
+  caps a source's title at 120 characters and its reference at 160, the same as
+  this app, and its pipeline refuses any document that could exceed them, so a
+  long title can no longer make the app refuse a whole reply.
+
 ## Unreleased — 2026-09-22
 
 Three asks: declutter the character page, give the room a background instead of
