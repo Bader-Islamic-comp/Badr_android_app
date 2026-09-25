@@ -18,3 +18,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/robert/Robert.png
+    - assets/room/backdrop_desert.png

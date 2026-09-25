@@ -1,5 +1,7 @@
 # ADR 0002: Synthetic development foundation before launch decisions
 
+Superseded in part by ADR 0003 (`comp-server/doc/adr-0003-grounded-answers-development.md`) for grounded answers.
+
 Status: accepted engineering boundary; launch decisions pending.
 
 The supplied roadmap has no named scholarly approvers, licensed reviewed corpus, jurisdiction-specific safeguarding playbook, consent design approval or finalized launch market/curriculum. This increment supports adult-operated synthetic development only. It must not be distributed as a child product.

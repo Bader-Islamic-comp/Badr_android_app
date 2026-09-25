@@ -36,6 +36,14 @@ Check ($limitedSession.Receive((Envelope 'app.pause' @{} 1)).Reason -eq 'asset_u
 $equipment = $session.Receive((Envelope 'avatar.set_cosmetics' @{cosmeticId='default'} 135))
 Check ($equipment.Accepted -and $equipment.NeedsAcknowledgement) 'Equipment accepted with acknowledgement'
 Check (!$session.Receive((Envelope 'avatar.set_cosmetics' @{cosmeticId='unowned'} 136)).Accepted) 'Unowned equipment rejected'
+# The catalogue runs on its own session: accepting a look advances the
+# watermark, and the checks below depend on where the shared one is.
+$wardrobeAvatar = New-Object CoreTestAvatar
+$wardrobe = New-Object Companion.Presentation.BridgeSession($wardrobeAvatar)
+$null = $wardrobe.Receive($init)
+$earned = $wardrobe.Receive((Envelope 'avatar.set_cosmetics' @{cosmeticId='sunset'} 1))
+Check ($earned.Accepted -and $earned.NeedsAcknowledgement) 'An earned catalogue look is accepted'
+Check (!$wardrobe.Receive((Envelope 'avatar.set_cosmetics' @{cosmeticId='SUNSET'} 2)).Accepted) 'Catalogue ids are matched exactly'
 $avatar.AcceptCommands = $false
 $before = $avatar.Calls
 Check ($session.Receive((Envelope 'avatar.play' @{animation='Wave'} 136)).Reason -eq 'presentation_rejected' -and $avatar.Calls -eq $before) 'Paused/rejected presentation does not falsely signal asset failure'

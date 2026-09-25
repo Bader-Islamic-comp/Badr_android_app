@@ -91,6 +91,44 @@ namespace Companion.Presentation.Tests
 
         private static string TypeOf(string json) { return Parsed(json).Groups["type"].Value; }
 
+        /// <summary>Drives one frame of the receiver's own polling.</summary>
+        private static void Tick(CompanionBridgeReceiver receiver)
+        {
+            MethodInfo update = typeof(CompanionBridgeReceiver).GetMethod(
+                "Update", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(update, "the readiness poll was renamed");
+            update.Invoke(receiver, null);
+        }
+
+        [Test]
+        public void A_room_that_cannot_perform_yet_does_not_claim_readiness()
+        {
+            FakePresentation presentation;
+            CompanionBridgeReceiver receiver = Build(out presentation);
+            // The skin controller installs the visual in Start, so the room is
+            // genuinely unavailable while every Awake is still running.
+            presentation.Available = false;
+            FakeTransport transport = new FakeTransport();
+
+            Assert.IsTrue(receiver.BindTransport(transport));
+            Assert.IsEmpty(transport.Sent,
+                "readiness releases the host's held commands, so it must wait " +
+                "for a room that can answer them");
+
+            Tick(receiver);
+            Assert.IsEmpty(transport.Sent);
+
+            presentation.Available = true;
+            Tick(receiver);
+            Assert.AreEqual(1, transport.Sent.Count);
+            Assert.AreEqual("unity.ready", TypeOf(transport.Sent[0]));
+
+            // Announced once, not once per frame.
+            Tick(receiver);
+            Tick(receiver);
+            Assert.AreEqual(1, transport.Sent.Count);
+        }
+
         [Test]
         public void Binding_a_transport_announces_installed_capabilities()
         {

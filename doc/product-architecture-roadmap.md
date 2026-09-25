@@ -14,7 +14,7 @@ The first product target is an Android phone app, not a website. Flutter sends u
 
 The character-first main page should follow the supplied mobile `assets/ui.make` layout while retaining the existing ivory, teal and orange colors. Robert should use the supplied 3D model, gentle idle animation, blinking and brief reactions while visible, with background pause, reduced-motion support and static fallback. The native composition must be validated against the full-screen Unity boundary in section 4.2; a browser preview is not evidence of Android integration.
 
-This clarification selects the delivery platform and inference location. It does not waive governance, provider review, privacy, device testing, or server-authoritative progress/rewards requirements. Current development builds still have no enabled AI provider.
+This clarification selects the delivery platform and inference location. It does not waive governance, provider review, privacy, device testing, or server-authoritative progress/rewards requirements. Current development builds use no third-party AI provider. Since 2026-09-25 the backend has development-only grounded answers, off by default: retrieval over a synthetic app-help corpus release and a self-hosted Qwen3.5-9B (`comp-server/doc/rag-system.md`). The phone app still has no model and no provider credentials.
 
 The baseline design assumes:
 
@@ -200,6 +200,10 @@ LangChain may implement retrieval and workflow composition. LiteLLM is the only 
 
 Do not expose raw token-by-token generation to children. Validate a complete sentence or short semantic segment before displaying or speaking it.
 
+**Status (2026-09-25, development only).** A first, text-only version of this flow exists behind a server switch that is off by default, over synthetic app-help content rather than an approved corpus. Input routing uses development keyword rules, not an approved safeguarding classifier. Voice (the recording in step 1, and steps 3, 11 and 12) is not implemented. Flutter does not yet stream segments (step 10). Instead, it reads `GET /v1/turns/{id}` every second for the complete, verified reply, for up to 90 seconds per attempt, and a retry resumes the same turn. The Talk page labels each reply by its answer type. `grounded` and `reviewed_answer` show as "From Robert’s library", with a plain-text list of sources. `abstained`, `redirected` and `safety` each have their own calm label, and `unavailable` appears when the switch is off. The model produces no avatar cues (step 7), and Unity receives no reply text. The contract is `comp-server/doc/rag-system.md` §7.
+
+**Casual chat and faith (2026-09-25, development only).** In the router (step 5), a deterministic faith-topic detector sends every faith question to the corpus alone: a reviewed answer, or a grounded answer that verifies and actually answers, otherwise a gentle abstention saying Robert has no checked lesson about it. Faith is never answered from model memory or by casual chat. Small talk such as "Hi, how are you?" gets a short reply in Robert's voice from a persona prompt, released as answer type `chat` only after its own checks (no faith content, no requests for personal details, no attachment, a trusted-adult line for a difficult feeling), or replaced by reviewed copy. It carries no sources and no label in the app, and now and then a reviewed line invites the child to a lesson in the Learn tab. This is the one scoped exception to grounding verification (step 8). The policy is `comp-server/doc/conversation-policy.md`, the character is `comp-server/doc/robert-persona.md`, and the boundary is ADR 0004 (`comp-server/doc/adr-0004-casual-conversation.md`). All of its copy awaits safeguarding and scholarly review.
+
 ### 5.2 Client/backend protocol
 
 Prefer REST plus Server-Sent Events for the MVP:
@@ -224,6 +228,7 @@ GET    /v1/challenges/today
 POST   /v1/challenges/{id}/progress-events
 GET    /v1/rewards
 GET    /v1/inventory
+POST   /v1/cosmetics/claim
 PUT    /v1/equipped-cosmetics
 
 POST   /v1/admin/sources
@@ -253,6 +258,8 @@ Voice should not enter a pilot until deletion has been technically demonstrated 
 Reference: [FTC COPPA FAQ](https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions).
 
 ## 6. RAG and religious-content governance
+
+> **Implementation status (development, 2026-09-25):** the ingestion pipeline (6.3) and the query policy (6.4) are implemented in `comp-server/src/companion_api/rag/` against a synthetic app-help corpus (`comp-server/corpus/dev-app-help/`), with the contract in `comp-server/doc/rag-system.md` and the boundary in ADR 0003 (`comp-server/doc/adr-0003-grounded-answers-development.md`). The approval step (6.3 step 7) is recorded as document metadata only, with no review workflow, and there is no reranker (6.4 step 4). Releases are immutable files on disk searched in memory; PostgreSQL and `pgvector` are not yet used. The governance below is still to be established; nothing here is approved for children.
 
 ### 6.1 Governance ownership
 

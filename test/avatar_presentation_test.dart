@@ -8,6 +8,7 @@ AvatarBridge connect(FakeUnityHost host, {Duration? spacing}) => AvatarBridge(
       commands: host.commands,
       events: host.events,
       timeout: const Duration(milliseconds: 60),
+      startupTimeout: const Duration(milliseconds: 60),
       reactionSpacing: spacing ?? Duration.zero,
     );
 

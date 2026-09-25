@@ -9,20 +9,22 @@ and rebuilt at any time. The canonical character package under
 
 Verified with Unity 6000.3.24f1 (Android Build Support, bundled OpenJDK/SDK/NDK)
 and the Android toolchain (SDK 36, build-tools 36.0.0, JetBrains Runtime 25).
-**No glTF model is imported, no scene is built and no Android export is
-produced**, so rendering, the Unity-as-a-Library composition and every device
-measurement remain unverified. No device or emulator is available.
+The model imports, the scene builds, the Android export is produced and the room
+renders on an x86_64 emulator — see *What the device run proved* below for what
+that run did and did not settle. No physical device has been used, so startup
+time, memory, frame time, ARM64, TalkBack and rotation remain unmeasured.
 
 ## What is and is not verified
 
 | Source | State |
 |---|---|
-| `Assets/Companion/Runtime/BridgeCommand.cs` | Compiles; **executed** by 34 engine-free checks and the EditMode suite |
-| `Assets/Companion/Runtime/BridgeSession.cs` | Compiles; **executed** by 34 engine-free checks and the EditMode suite |
-| `Assets/Companion/Runtime/CompanionBridgeReceiver.cs` | Compiles; **executed** by 11 EditMode tests |
-| `Assets/Companion/Runtime/RobertAvatarPresentation.cs` | Compiles; never executed — needs an imported model and scene |
-| `Assets/Companion/Runtime/AndroidUnityEventTransport.cs` | Compiles; never executed — needs an Android export and a device |
-| `../android/.../UnityRoomPlugin.kt`, `UnityRuntime.kt`, `MainActivity.kt` | Compiles into debug and release APKs; never executed |
+| `Assets/Companion/Runtime/BridgeCommand.cs` | Compiles; **executed** by 36 engine-free checks and the EditMode suite |
+| `Assets/Companion/Runtime/BridgeSession.cs` | Compiles; **executed** by 36 engine-free checks and the EditMode suite |
+| `Assets/Companion/Runtime/CompanionBridgeReceiver.cs` | Compiles; **executed** by 12 EditMode tests |
+| `Assets/Companion/Runtime/RobertAvatarPresentation.cs` | Compiles; its scene renders on an emulator and an equipped look recolours the character there. Emotions and one-shot clips are exercised only through the session core |
+| `Assets/Companion/Runtime/RoomBackdrop.cs` | Compiles; its quad renders on an emulator. No aspect other than the emulator's has been seen |
+| `Assets/Companion/Runtime/AndroidUnityEventTransport.cs` | Compiles; **executed** on an emulator — its events reach Flutter and the handshake completes |
+| `../android/.../UnityRoomPlugin.kt`, `UnityRuntime.kt`, `MainActivity.kt` | Compiles into debug and release APKs; runs on an emulator |
 
 `BridgeCommand` and `BridgeSession` are deliberately free of engine and
 third-party dependencies, including the JSON reader, so the part of the contract
@@ -50,7 +52,8 @@ installed and then negotiated capabilities, acknowledgements naming the message
 they answer, malformed envelopes producing no reply at all, best-effort cues
 going unacknowledged, refused equipment answering with its reason, missing
 assets reporting `asset.failed`, nothing being accepted without a connected
-transport, and outgoing sequences increasing with unique message IDs.
+transport, readiness waiting for a presentation that can actually perform, and
+outgoing sequences increasing with unique message IDs.
 
 Neither suite is a substitute for importer verification, scene inspection,
 rendering checks or Android device tests. The kit intentionally leaves those
@@ -105,6 +108,41 @@ the app a second launcher icon and categorise a children's learning app as a
 game, so `../android/app/src/main/AndroidManifest.xml` strips both. Those rules
 are inert when no export is present.
 
+### The backdrop
+
+The room has no skybox and used to clear to transparent black, which on a device
+read as a pitch-black void wherever the full-bleed Flutter page was not
+painting. `tools/make_backdrop.py` draws a plain desert horizon from the project
+palette — decoration only, with no text, symbol or real place, so it needs no
+content review — and the builder parks it on an unlit quad behind the character.
+
+The generator writes the same image twice, because two things show it: this
+project's `Assets/Companion/Room/backdrop_desert.png`, and the Flutter app's
+`../assets/room/backdrop_desert.png`, which backs every page that is *not* the
+character page so those pages read as the same place without Robert in them. One
+generator, one picture, two consumers.
+
+```powershell
+python unity/tools/make_backdrop.py
+```
+
+Three details are worth keeping:
+
+- **The quad carries both windings.** Which way a camera ends up facing a
+  generated quad is easy to get wrong by one 180° rotation, and the symptom is
+  an invisible backdrop with no error. Four extra triangles removes the
+  question entirely.
+- **`RoomBackdrop` sizes it at runtime, not at build time.** How large the quad
+  must be depends on the viewport, which the builder does not know. The
+  component fills the frustum and centre-crops the texture to the screen's
+  shape — "cover", not "stretch" — and redoes that whenever the aspect or field
+  of view changes. A portrait phone therefore sees a narrow centre slice of a
+  2:1 image, which is why the generator keeps the composition centred.
+- **The camera is nearly level.** It used to be pitched 10° down, and pitching
+  down pushes the subject *up* the frame, which stranded the character against
+  the sky above the backdrop's horizon. It is now 2°, with no vertical lift and
+  a tighter margin, so Robert stands on the sand in the middle of the frame.
+
 ### Why FBX and not the GLB
 
 The canonical runtime model is `Robert.glb`, but it is **not** what this project
@@ -132,8 +170,9 @@ builds its own. Blender writes one take per action, which Unity names
 
 `CompanionBridgeReceiver.ReceiveMessage(string)` is the entry point for Unity
 native messaging. Commands use the shared v1 contract in
-`../contracts/avatar-bridge-v1.schema.json`. Only Robert and the default skin are
-accepted. Input is bounded to 4096 characters and parsed with a strict
+`../contracts/avatar-bridge-v1.schema.json`. Only Robert is accepted, and only
+the looks the room was built with: `default`, `sunset`, `dune` and `midnight`,
+allowlisted in `BridgeCommand.Cosmetics` and matched exactly. Input is bounded to 4096 characters and parsed with a strict
 allowlist: extra or duplicate fields, unsupported commands, malformed UUIDs,
 unsupported versions, fractional or negative sequences, unknown cosmetics, and
 any field carrying child text or audio all fail before presentation changes.
@@ -153,9 +192,12 @@ order. Only the intersection of requested and installed capabilities is enabled.
 The 128-entry retry cache returns the same outcome without replaying a mutation;
 evicted messages are still refused by the sequence watermark.
 
-Initialization selects neutral face and Idle. Default equipment is already
-installed and cannot grant ownership — Flutter sends equipment changes only
-after the server has validated its own inventory. A cue rejected while paused
+Initialization selects neutral face, Idle and the current look. Equipment
+cannot grant ownership — Flutter sends a look only after the service has
+recorded that it was earned and worn. A look currently recolours every renderer
+of the installed visual except the face screen, which keeps its approved art;
+the skin system already swaps whole model prefabs, so modelled garments arrive
+later as new skin definitions without changing this contract. A cue rejected while paused
 answers `presentation_rejected`, never `asset_unavailable`, and leaves the
 watermark untouched so the sender can reuse that sequence.
 
@@ -236,6 +278,34 @@ The builder therefore unpacks the instance completely before wiring, and then
 calls `Rebind()` and `SetDefaultFace()` itself so a broken binding fails the
 build rather than the device.
 
+### Readiness must wait for a room that can perform
+
+The receiver announced `unity.ready` from `BindTransport`, which the transport
+calls in `Awake`. The host releases every command it was holding the moment it
+hears any event from Unity, so the queued `avatar.initialize` was delivered
+immediately — while `RobertSkinController.Start` had not yet installed the
+visual. `IsAvailable` was therefore false, the session answered
+`asset_unavailable`, and Flutter fell back to the static avatar **for good, on
+every single launch**, with the room rendering perfectly behind it.
+
+The symptom was a status chip reading "Character room · not connected" over a
+visibly working room, which points at the transport and is nothing to do with
+it. What settled it was a lifecycle trace of the host: `attach`, `onPlayerReady`
+and `onListen` all arrived in order, Unity's events arrived with a live sink,
+and their lengths matched `asset.failed` rather than an acknowledgement.
+
+The receiver now announces readiness from `Update`, once — and only once — the
+presentation reports it can perform. A room whose assets never arrive simply
+never claims readiness and Flutter's own deadline falls back, which is the
+outcome that was wanted anyway.
+
+Two deadlines were wrong for the same underlying reason. Initialization used the
+ordinary 3-second bridge timeout, but it waits on the engine starting: Unity
+takes around six seconds on this emulator, and the handshake had already given
+up. `AvatarBridge.startupTimeout` now covers both that and the surface probe,
+because both wait for an engine rather than for a room that is already
+answering.
+
 ## What the device run proved
 
 On an Android 16 x86_64 emulator the app installs, launches without crashing and
@@ -260,22 +330,23 @@ io.flutter.embedding.android.FlutterView{... 0,0-1080,2400 #1}
 
 The room renders. `design/room-on-device.png` is the character running full
 bleed behind the Flutter layer on that emulator: the Blender model, its rig and
-the neutral face texture, framed from the model's own measured bounds with the
-page's cards and scrims over it.
+the neutral face texture, framed from the model's own measured bounds, standing
+on the generated desert backdrop with only the composer and the navigation over
+it.
 
-Two things remain:
+**The bridge handshake completes.** The parent area's room line reads "Character
+room · playing", the greeting wave runs, and an earned look sent as
+`avatar.set_cosmetics` recolours the character in the room. That is the full
+path — Flutter to the host, the host to Unity, Unity's events back to Flutter —
+running on a device.
 
-- **The bridge handshake does not complete.** The status chip still reads
-  "Character room · not connected", so `unity.ready` is not reaching Flutter and
-  no presentation cue can be delivered. The receiver, transport and host
-  queueing are in place and unit-tested; what has not been confirmed on a device
-  is the `AndroidJavaClass` hop from the Unity transport into
-  `CompanionEventBridge`.
+One thing remains:
+
 - **A cold first launch can still miss the room.** Immediately after an install
-  the page came up opaque and a warm relaunch showed the room, so the surface
-  probe's 20-second deadline is not always enough on a loaded emulator. A
-  deadline is the wrong instrument for this: the host should push a "room
-  attached" event rather than have Flutter wait on a reply.
+  the page came up opaque and a warm relaunch showed the room. The surface probe
+  now shares the longer startup deadline, which helps, but a deadline is the
+  wrong instrument: the host should push a "room attached" event rather than
+  have Flutter wait on a reply.
 
 ## Open device questions
 
@@ -290,8 +361,8 @@ character room is treated as a capability rather than a prototype:
   not been approved yet.
 - Crash and lifecycle behaviour across background, rotation and process death.
 - Whether the reflective names in `UnityRuntime.kt` match the actual export.
-- Whether the glTF importer produces the four required clips on the imported
-  root, and whether the face material renders correctly in the chosen pipeline.
+- Whether the backdrop's runtime "cover" crop still frames well on aspects other
+  than the emulator's 1080x2400, including a tablet and a landscape rotation.
 - Whether `CompanionEventBridge` survives release shrinking in the final app.
   R8 renames it by default, which breaks the Unity-to-Flutter event path in
   release builds only; `android/app/proguard-rules.pro` keeps it, and that rule

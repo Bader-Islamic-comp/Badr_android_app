@@ -55,12 +55,87 @@ void main() {
     var writes = 0;
     final api = DemoApi(config, client: MockClient((request) async {
       if (request.method != 'GET') writes++;
-      return http.Response('{"items":[{"id":"default","owned":false}]}', 200);
+      return http.Response('{"items":[{"id":"sunset","owned":false}]}', 200);
     }));
-    await expectLater(api.equipDefault('equipment-key-123'),
+    await expectLater(api.equipCosmetic('sunset', 'equipment-key-123'),
         throwsA(isA<DemoApiException>()));
     expect(writes, 0);
     api.close();
+  });
+
+  test('a claim the service does not confirm is a failure, not a look',
+      () async {
+    final api = DemoApi(config,
+        client: MockClient((_) async =>
+            // Right shape, wrong look: answering about another id must never
+            // be read as this one having been earned.
+            http.Response(
+                '{"cosmeticId":"dune","owned":true,"spent":0,'
+                '"balance":40}',
+                200)));
+    await expectLater(api.claimCosmetic('sunset', 'claim-key-123'),
+        throwsA(isA<DemoApiException>()));
+    api.close();
+  });
+
+  group('bootstrap', () {
+    Map<String, dynamic> development({Map<String, Object?>? features}) => {
+          'mode': 'development',
+          'characterId': 'robert',
+          'profileId': 'demo-child',
+          'contentStatus': 'awaiting_review',
+          'features': features ??
+              {'voice': false, 'generativeAnswers': false, 'unity': false},
+        };
+
+    DemoApi serving(Map<String, dynamic> payload) => DemoApi(config,
+        client:
+            MockClient((_) async => http.Response(jsonEncode(payload), 200)));
+
+    test('reports whether the service has grounded answers on', () async {
+      for (final grounded in [true, false]) {
+        final api = serving(development(features: {
+          'voice': false,
+          'generativeAnswers': grounded,
+          'unity': false,
+        }));
+        expect(await api.bootstrap(), grounded);
+        api.close();
+      }
+    });
+
+    final refused = <String, Map<String, dynamic>>{
+      'voice switched on': development(features: {
+        'voice': true,
+        'generativeAnswers': true,
+        'unity': false,
+      }),
+      'voice missing': development(features: {'generativeAnswers': true}),
+      'grounded answers as a string': development(features: {
+        'voice': false,
+        'generativeAnswers': 'true',
+        'unity': false,
+      }),
+      'grounded answers missing': development(features: {'voice': false}),
+      'features that are not an object': {
+        ...development(),
+        'features': ['voice'],
+      },
+      'another mode': {...development(), 'mode': 'production'},
+      'another character': {...development(), 'characterId': 'someone'},
+      'another profile': {...development(), 'profileId': 'real-child'},
+      'reviewed content': {...development(), 'contentStatus': 'published'},
+    };
+    for (final entry in refused.entries) {
+      test('refuses a service with ${entry.key}', () async {
+        final api = serving(entry.value);
+        await expectLater(
+            api.bootstrap(),
+            throwsA(isA<DemoApiException>().having((error) => error.message,
+                'message', 'This app requires the development-only service.')));
+        api.close();
+      });
+    }
   });
 
   test('server error bodies are never surfaced', () async {

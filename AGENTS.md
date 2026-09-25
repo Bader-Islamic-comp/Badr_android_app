@@ -63,7 +63,7 @@ LangChain and LiteLLM are infrastructure behind domain-owned interfaces. LangCha
 
 ## AI and RAG requirements
 
-Every child message must pass through server-side input safety and routing before any generative model call. Every generated response must pass grounding verification and output safety before release.
+Every child message must pass through server-side input safety and routing before any generative model call. Every generated answer to a question must pass grounding verification before release. Casual chat replies (ADR 0004) cannot be grounded: they must pass the conversation-policy checks instead and never carry generated faith content. All generated text must pass output safety before release.
 
 - Retrieve only from immutable, published, scholar-approved corpus releases.
 - Never use open-web retrieval in the child experience.
@@ -75,6 +75,8 @@ Every child message must pass through server-side input safety and routing befor
 - Buffer and validate complete sentences or semantic segments before streaming. Never expose raw token-by-token model output to a child.
 - Abstain gently when evidence is insufficient and recommend asking a parent, teacher, or qualified local scholar as appropriate.
 - Record model, prompt-policy, retriever, and corpus versions without placing raw child content in ordinary logs.
+- The development RAG implementation lives in the backend and follows `comp-server/doc/rag-system.md` within the boundary of ADR 0003 (`comp-server/doc/adr-0003-grounded-answers-development.md`). The backend's `corpus/dev-app-help` must stay synthetic app help; never add religious content to it.
+- Faith questions are answered only from the corpus, never from model memory or casual chat. How each message is handled follows `comp-server/doc/conversation-policy.md`, Robert's character is `comp-server/doc/robert-persona.md`, and the boundary for casual chat is ADR 0004 (`comp-server/doc/adr-0004-casual-conversation.md`).
 
 Do not silently switch to an unreviewed model or speech provider. Provider additions require privacy, retention, training-use, residency, safety, and evaluation review.
 
