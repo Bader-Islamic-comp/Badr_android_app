@@ -121,10 +121,14 @@ class _ParentSheetState extends State<_ParentSheet> {
                           leading: Icon(Icons.auto_stories_outlined),
                           title:
                               Text('Grounded answers: on · development corpus'),
+                          // Chat is not from the library, so the provenance a
+                          // parent reads here has to say so.
                           subtitle: Text(
-                              'Answers come only from the service’s development '
-                              'library and show their sources. The model runs '
-                              'on the service, never on this phone.'))
+                              'Questions are answered only from the service’s '
+                              'development library, with their sources. Casual '
+                              'chat, like a hello, gets a friendly reply '
+                              'without sources. The model runs on the service, '
+                              'never on this phone.'))
                       : const ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: Icon(Icons.auto_stories_outlined),

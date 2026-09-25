@@ -407,7 +407,7 @@
         "type": "object"
       },
       "Turn": {
-        "description": "`answerType` is null and `text` empty while pending; completed text is 1-1200 characters.",
+        "description": "`answerType` is null and `text` empty while pending; completed text is 1-1200 characters.\n\n`citations` and `sources` are empty for every type except `grounded` and `reviewed_answer`.",
         "properties": {
           "answerType": {
             "anyOf": [
@@ -418,7 +418,8 @@
                   "reviewed_answer",
                   "abstained",
                   "redirected",
-                  "safety"
+                  "safety",
+                  "chat"
                 ],
                 "type": "string"
               },

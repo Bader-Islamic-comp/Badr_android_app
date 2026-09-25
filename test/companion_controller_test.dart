@@ -468,6 +468,22 @@ void main() {
           isNull);
     });
 
+    test('a chat reply parses with no sources and is not from the library', () {
+      final reply = Reply.fromTurn({
+        ...valid(),
+        'answerType': 'chat',
+        'text': 'Hi! I’m happy, thank you. What would you like to learn?',
+        'citations': [],
+        'sources': [],
+      }, turnId: 'turn-1')!;
+      expect(reply.type, ReplyType.chat);
+      expect(reply.type.wire, 'chat');
+      expect(reply.type.cited, isFalse);
+      expect(reply.text,
+          'Hi! I’m happy, thank you. What would you like to learn?');
+      expect(reply.sources, isEmpty);
+    });
+
     final rejected =
         <String, Map<String, dynamic> Function(Map<String, dynamic>)>{
       'a chunk id that breaks the pattern': (turn) => turn
@@ -495,6 +511,8 @@ void main() {
       'sources on an abstained reply': (turn) =>
           turn..['answerType'] = 'abstained',
       'sources on a safety reply': (turn) => turn..['answerType'] = 'safety',
+      // Chat is Robert talking, so it may not borrow the library's authority.
+      'sources on a chat reply': (turn) => turn..['answerType'] = 'chat',
       'a library reply with no sources': (turn) => turn
         ..['citations'] = []
         ..['sources'] = [],

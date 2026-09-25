@@ -185,6 +185,11 @@ enum ReplyType {
   /// A reviewed answer-bank entry, returned word for word.
   reviewedAnswer('reviewed_answer'),
 
+  /// Casual conversation, such as a reply to "Hi, how are you?". This is Robert
+  /// talking, not the library, so it carries no sources and is never framed
+  /// as an answer from anywhere.
+  chat('chat'),
+
   /// Not enough evidence, so Robert says he is not sure rather than guess.
   abstained('abstained'),
 
@@ -199,7 +204,8 @@ enum ReplyType {
   /// The `answerType` value on the wire.
   final String wire;
 
-  /// Only these two come from the library, so only they carry sources.
+  /// Only these two come from the library, so only they carry sources. Chat
+  /// is deliberately not one of them.
   bool get cited => this == grounded || this == reviewedAnswer;
 }
 
@@ -223,9 +229,9 @@ class ReplySource {
 /// Every rule of the contract is enforced here, because this is the text a
 /// child reads and the provenance a parent relies on. A payload that breaks
 /// one is refused whole rather than shown in part: a reply that claims to be
-/// from the library but carries no sources, or a fixed reply that carries some,
-/// is not something to render and hope. Errors are generic and never echo what
-/// the service sent.
+/// from the library but carries no sources, or any other reply (a fixed one
+/// or casual chat) that carries some, is not something to render and hope.
+/// Errors are generic and never echo what the service sent.
 class Reply {
   const Reply(
       {required this.type, required this.text, this.sources = const []});

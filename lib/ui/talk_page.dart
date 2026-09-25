@@ -73,17 +73,24 @@ class TalkPage extends StatelessWidget {
         },
       );
 
-  /// What each kind of reply is called above its text, and in what colour.
+  /// What each kind of reply is called above its text, and in what colour, or
+  /// null for no label at all.
   ///
   /// Only the service's own answer type decides this. The wording stays calm
   /// for every kind: not being sure, or being pointed to a grown-up, is not a
   /// mistake the child made, and the safeguarding label is deliberately in the
   /// steady ink colour rather than an alert one.
-  static (String, Color) labelFor(ReplyType type) => switch (type) {
+  ///
+  /// Casual chat has no label. The bubble is already Robert talking to the
+  /// child, and a label is there to say where a reply came from; chat claims
+  /// to come from nowhere, so it says nothing. Left bare, it also cannot be
+  /// mistaken for a library reply, which is always named and always sourced.
+  static (String, Color)? labelFor(ReplyType type) => switch (type) {
         ReplyType.grounded || ReplyType.reviewedAnswer => (
             'From Robert’s library',
             teal
           ),
+        ReplyType.chat => null,
         ReplyType.abstained => ('Robert isn’t sure', muted),
         ReplyType.redirected => ('Let’s ask a grown-up', orange),
         ReplyType.safety => ('You can talk to a grown-up you trust', ink),
@@ -148,23 +155,23 @@ class TalkPage extends StatelessWidget {
     );
   }
 
-  /// Says Robert is working on it, in place of the old reply. It only mentions
-  /// the library when the service has one switched on.
+  /// Says Robert is working on it, in place of the old reply.
+  ///
+  /// One line for every kind of reply. Which kind is coming is the service's
+  /// decision and is not known yet, and a "hi" is not a trip to the library.
+  /// The antennae are Robert's own: two, orange-tipped, on the model.
   Widget _thinking(BuildContext context) => Row(children: [
         SizedBox.square(
           dimension: 18,
           child: MediaQuery.disableAnimationsOf(context)
               // Animation is never needed to understand the page.
-              ? const Icon(Icons.auto_stories_outlined, size: 18, color: teal)
+              ? const Icon(Icons.smart_toy_outlined, size: 18, color: teal)
               : const CircularProgressIndicator(strokeWidth: 2, color: teal),
         ),
         const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-              model.groundedAnswers
-                  ? 'Robert is looking in his library…'
-                  : 'Robert is thinking…',
-              style: const TextStyle(fontSize: 15, color: muted)),
+        const Flexible(
+          child: Text('Robert is thinking… his antennae are wiggling',
+              style: TextStyle(fontSize: 15, color: muted)),
         ),
       ]);
 
@@ -207,7 +214,8 @@ class TalkPage extends StatelessWidget {
 
   /// Clearing is the one control that belongs beside the reply: it removes the
   /// reply and asks the service to delete the conversation it came from. It
-  /// stays usable while Robert is thinking, which also stops the wait.
+  /// stays usable while Robert is thinking, which also stops the wait. With no
+  /// label, while thinking or for chat, the row carries the × alone.
   Widget _bubbleHeader(Reply? reply) {
     final label = reply == null ? null : labelFor(reply.type);
     return Row(children: [

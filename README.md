@@ -47,8 +47,9 @@ by loosening a client check.
 
 **Talk carries the character, the composer and nothing else.** The last answer
 sits in a single bubble just above the composer; with no answer yet the page is
-just Robert. The bubble says where the answer came from. While Robert is
-thinking, it says that instead (see [Grounded answers](#grounded-answers)).
+just Robert. The bubble says where an answer came from; casual chat has no
+label, because it is just Robert talking. While Robert is thinking, it says
+that instead (see [Grounded answers](#grounded-answers)).
 Earlier answers are not kept. Everything else moved to where it
 belongs — the orientation prompt to Learn, the service connection to Quests,
 Style and the parent area, and the room's own state and its retry to the parent
@@ -278,15 +279,18 @@ To try it:
    above, then connect from Quests, Style or the parent area. The parent area
    should then read "Grounded answers: on · development corpus". If it reads
    "Grounded answers: off", the server was started without them.
-3. Ask on Talk. While the service works, the bubble says "Robert is looking in
-   his library…" next to a spinner, or a book icon under reduced motion. With
-   grounded answers off, it says "Robert is thinking…".
+3. Ask on Talk. The composer's hint reads "Say hi or ask (test text only)".
+   While the service works, the bubble says "Robert is thinking… his antennae
+   are wiggling" next to a spinner, or a still robot icon under reduced motion.
+   The line is the same for every kind of reply, because which kind is coming
+   is not known until the service answers.
 
 **The corpus is synthetic app help only.** It is invented help text about using
 the app, covering stars, looks, quests, the parent area and taking a break. It
 contains no religious teaching and has not been reviewed for children. Ask
 synthetic questions about the app. Questions outside the corpus should come
-back as "Robert isn’t sure" or "Let’s ask a grown-up", not as an answer. The
+back as "Robert isn’t sure" or "Let’s ask a grown-up", not as an answer. A
+hello such as "Hi, how are you?" gets a short chat reply instead. The
 server refuses any model host that is not on the operator's machine or private
 network, so no question goes to a third-party provider.
 
@@ -296,6 +300,7 @@ infers the label from the text:
 | Answer type | Label | Colour |
 |---|---|---|
 | `grounded`, `reviewed_answer` | "From Robert’s library", with a Sources list | teal |
+| `chat` | No label: just Robert's words, with the × beside them | — |
 | `abstained` | "Robert isn’t sure" | muted |
 | `redirected` | "Let’s ask a grown-up" | orange |
 | `safety` | "You can talk to a grown-up you trust" | ink |
@@ -303,24 +308,28 @@ infers the label from the text:
 
 Only library replies carry sources. Each one appears under the text as a title
 with its reference beneath, in plain text, because there is nothing on the
-phone to open. A reply of any other type that carries sources is refused. The
-labels stay calm, because not being sure, or being pointed to a grown-up, is
-not a mistake the child made. The safety label uses the steady ink colour
+phone to open. A reply of any other type that carries sources is refused,
+including chat. Chat has no label because a label says where a reply came
+from, and chat claims to come from nowhere; left bare, it cannot be mistaken
+for a library reply, which is always named and sourced. The labels stay calm,
+because not being sure, or being pointed to a grown-up, is not a mistake the
+child made. The safety label uses the steady ink colour
 rather than an alert colour. A long reply opens at its first sentence, and the
 sources are further down.
 
 ## Verification coverage and remaining work
 
-The 81-test suite covers no-network default mode, server-owned rewards, ownership
-rejection, idempotent completion headers, resuming known question turns, the
-bootstrap's grounded-answers flag, polling a pending turn to its deadline and
-resuming it, every turn-contract rule, clearing and disposal mid-wait, the reply
-labels and sources, sanitized failures, missing native host, malformed bridge
-events, cancellation of native deadlines on disposal, asynchronous send/delete
-disposal, offline orientation, 320px/large-text layout, the character-page
-visibility and foreground policy, reduced motion, the bounded reaction queue,
-coordinated room recreation and its bound, and activatable button semantics for
-the orientation controls.
+The 86-test suite covers no-network default mode, server-owned rewards,
+ownership rejection, idempotent completion headers, resuming known question
+turns, the bootstrap's grounded-answers flag, polling a pending turn to its
+deadline and resuming it, every turn-contract rule, clearing and disposal
+mid-wait, the reply labels and sources, unlabelled chat replies and the parent
+area's account of them, the thinking line and composer hint, sanitized failures,
+missing native host, malformed bridge events, cancellation of native deadlines
+on disposal, asynchronous send/delete disposal, offline orientation,
+320px/large-text layout, the character-page visibility and foreground policy,
+reduced motion, the bounded reaction queue, coordinated room recreation and its
+bound, and activatable button semantics for the orientation controls.
 
 Five of those tests cover the customization tab specifically: that a look is
 earned from the service rather than granted on the device, that the balance is
@@ -342,7 +351,9 @@ redirect all rendered as designed (`design/thinking-bubble.png`,
 `design/grounded-answer.png`, `design/redirect-reply.png`); the emulator and the
 loaded model only fit in memory together once Steam and Chrome were closed. No
 physical device has run it yet. At 320×380 with text
-at 2×, the composer's hint wraps and leaves the reply about 64 px.
+at 2×, the composer's hint still wraps. The shorter hint takes three lines
+rather than four and leaves the reply about 107 px rather than 56 (measured in
+the widget tester with Roboto loaded).
 
 A browser check of the built web preview previously found the orientation
 buttons missing from the accessibility tree. They are now exposed as buttons

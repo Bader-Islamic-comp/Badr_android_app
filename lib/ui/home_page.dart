@@ -310,8 +310,12 @@ class _CompanionHomeState extends State<CompanionHome>
                 isDense: true,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                // Friendly, but still says the text is for testing: this is a
+                // development build and nothing real belongs in it. Kept short
+                // so that at 320 px and 2× text it wraps less than the old
+                // hint did, not more.
                 hintText: model.connected
-                    ? 'Type a synthetic test question'
+                    ? 'Say hi or ask (test text only)'
                     : 'Connect the development service to ask',
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(999),

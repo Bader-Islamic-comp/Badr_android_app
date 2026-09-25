@@ -9,6 +9,7 @@ import 'package:companion_mobile/domain/models.dart';
 import 'package:companion_mobile/main.dart';
 import 'package:companion_mobile/theme.dart';
 import 'package:companion_mobile/ui/character_stage.dart';
+import 'package:companion_mobile/ui/talk_page.dart';
 import 'package:companion_mobile/ui/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -97,6 +98,27 @@ const _grounded = {
   ],
 };
 
+const _chatText = 'Hi! I’m happy, thank you. What would you like to learn?';
+
+/// Casual chat: Robert talking, so no citations and no sources.
+const _chat = {
+  'turnId': 'turn-1',
+  'status': 'completed',
+  'answerType': 'chat',
+  'text': _chatText,
+  'citations': [],
+  'sources': [],
+};
+
+/// The thinking line, the same whatever kind of reply is coming.
+const _thinking = 'Robert is thinking… his antennae are wiggling';
+
+/// The composer's hint once the development service is connected.
+const _hint = 'Say hi or ask (test text only)';
+
+final _liveRegion = find.byWidgetPredicate(
+    (widget) => widget is Semantics && widget.properties.liveRegion == true);
+
 /// A controller already holding a reply, to check how each kind is framed
 /// without a service.
 class _ReplyingController extends CompanionController {
@@ -156,14 +178,9 @@ void main() {
     await tester.tap(find.byTooltip('Send test question'));
     await _flush(tester);
 
-    const thinking = 'Robert is looking in his library…';
-    expect(find.text(thinking), findsOneWidget);
+    expect(find.text(_thinking), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(
-        find.ancestor(
-            of: find.text(thinking),
-            matching: find.byWidgetPredicate((widget) =>
-                widget is Semantics && widget.properties.liveRegion == true)),
+    expect(find.ancestor(of: find.text(_thinking), matching: _liveRegion),
         findsOneWidget,
         reason: 'a screen reader hears that Robert is thinking');
     // The bubble says it; a bar over Robert's page would say it twice.
@@ -180,7 +197,7 @@ void main() {
     waited.complete();
     await _flush(tester);
     expect(reads, 1);
-    expect(find.text(thinking), findsNothing);
+    expect(find.text(_thinking), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.text('From Robert’s library'), findsOneWidget);
     expect(find.text('You earn learning stars by finishing lessons.'),
@@ -235,13 +252,14 @@ void main() {
     await tester.enterText(find.byType(TextField), 'How do I earn stars?');
     await tester.tap(find.byTooltip('Send test question'));
     await _flush(tester);
-    // With grounded answers off there is no library to mention.
-    expect(find.text('Robert is thinking…'), findsOneWidget);
+    // Grounded answers are off here and on in the test above: the line is the
+    // same either way, because it never says what kind of reply is coming.
+    expect(find.text(_thinking), findsOneWidget);
 
     await tester.tap(find.byTooltip('Clear development conversation'));
     await _flush(tester);
     expect(deletes, 1);
-    expect(find.text('Robert is thinking…'), findsNothing);
+    expect(find.text(_thinking), findsNothing);
     expect(find.byTooltip('Clear development conversation'), findsNothing,
         reason: 'nothing is left to clear, so the bubble is gone');
     expect(find.text('Development conversation cleared.'), findsOneWidget);
@@ -283,6 +301,164 @@ void main() {
       model.dispose();
     });
   }
+
+  testWidgets(
+      'Robert says hi back with no label and no sources, and thinks without '
+      'a spinner under reduced motion', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final handle = tester.ensureSemantics();
+    final waited = Completer<void>();
+    final model = CompanionController(
+      DemoApi(
+        const DemoConfig(
+            baseUrl: 'http://localhost:8000', token: 'synthetic-token'),
+        client: MockClient((request) async {
+          switch (request.url.path) {
+            case '/v1/conversations':
+              return _json({'conversationId': 'conversation-1'});
+            case '/v1/conversations/conversation-1/turns':
+              return _json({'turnId': 'turn-1', 'status': 'pending'});
+            case '/v1/turns/turn-1':
+              return _json(_chat);
+            default:
+              return http.Response('{}', 404);
+          }
+        }),
+      ),
+      wait: (_) => waited.future,
+    )
+      ..connected = true
+      ..groundedAnswers = true;
+    await tester.pumpWidget(CompanionApp(controller: model));
+    await tester.pumpAndSettle();
+    // The composer invites a hello as well as a question, and still says the
+    // text is only for testing.
+    expect(find.text(_hint), findsOneWidget);
+    expect(find.text('Type a synthetic test question'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'Hi, how are you?');
+    await tester.tap(find.byTooltip('Send test question'));
+    await _flush(tester);
+    expect(find.text(_thinking), findsOneWidget);
+    expect(find.ancestor(of: find.text(_thinking), matching: _liveRegion),
+        findsOneWidget);
+    // Reduced motion: a still robot beside the line instead of a spinner, and
+    // no library book, because a hello is not a trip to the library.
+    final thinkingRow =
+        find.ancestor(of: find.text(_thinking), matching: find.byType(Row));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(
+        find.descendant(
+            of: thinkingRow, matching: find.byIcon(Icons.smart_toy_outlined)),
+        findsOneWidget);
+    expect(find.byIcon(Icons.auto_stories_outlined), findsNothing);
+
+    waited.complete();
+    await _flush(tester);
+    expect(find.text(_thinking), findsNothing);
+    expect(find.text(_chatText), findsOneWidget);
+    // Chat is Robert talking to the child, so the bubble carries his words and
+    // nothing that says where they came from: no label and no sources.
+    expect(TalkPage.labelFor(ReplyType.chat), isNull);
+    final bubble = find.ancestor(
+        of: find.text(_chatText), matching: find.byType(SingleChildScrollView));
+    expect(find.descendant(of: bubble, matching: find.byType(Text)),
+        findsOneWidget,
+        reason: 'the reply is the only text in the bubble');
+    for (final type in ReplyType.values) {
+      final label = TalkPage.labelFor(type);
+      if (label != null) expect(find.text(label.$1), findsNothing);
+    }
+    expect(find.text('Sources'), findsNothing);
+    // The header row still carries the one control that belongs beside a
+    // reply, and a screen reader still hears the reply arrive.
+    final clear = find.descendant(
+        of: bubble, matching: find.byTooltip('Clear development conversation'));
+    expect(clear, findsOneWidget);
+    expect(
+        tester
+            .widget<IconButton>(
+                find.ancestor(of: clear, matching: find.byType(IconButton)))
+            .onPressed,
+        isNotNull);
+    expect(find.ancestor(of: find.text(_chatText), matching: _liveRegion),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+    handle.dispose();
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  testWidgets('the parent area says chat replies carry no sources',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final model =
+        _ReplyingController(const Reply(type: ReplyType.chat, text: _chatText))
+          ..connected = true
+          ..groundedAnswers = true;
+    await tester.pumpWidget(CompanionApp(controller: model));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Learn'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Parent area'));
+    await tester.pumpAndSettle();
+    expect(
+        find.text('Grounded answers: on · development corpus'), findsOneWidget);
+    // The provenance a parent reads must not claim every reply is sourced.
+    expect(
+        find.text('Questions are answered only from the service’s development '
+            'library, with their sources. Casual chat, like a hello, gets a '
+            'friendly reply without sources. The model runs on the service, '
+            'never on this phone.'),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  testWidgets('a chat reply on the smallest screen stays in reach',
+      (tester) async {
+    // The size where the composer's hint already wraps and leaves the reply
+    // little room. The friendlier hint must not make that worse.
+    tester.view.physicalSize = const Size(320, 380);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final model =
+        _ReplyingController(const Reply(type: ReplyType.chat, text: _chatText))
+          ..connected = true;
+    await tester.pumpWidget(CompanionApp(controller: model));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CharacterStage), findsNothing);
+    expect(find.text(_hint), findsOneWidget);
+    expect(find.byTooltip('Send test question'), findsOneWidget);
+    final scrollView = find.ancestor(
+        of: find.text(_chatText), matching: find.byType(SingleChildScrollView));
+    expect(tester.getSize(scrollView).height, greaterThan(0),
+        reason: 'the composer leaves the reply some room');
+    // However little room is left, the words can be scrolled into view.
+    await tester.ensureVisible(find.text(_chatText));
+    await tester.pumpAndSettle();
+    final viewport = tester.getRect(scrollView);
+    final words = tester.getRect(find.text(_chatText));
+    expect(words.top, lessThan(viewport.bottom));
+    expect(words.bottom, greaterThan(viewport.top));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
 
   testWidgets('a long library reply on a small screen starts at its beginning',
       (tester) async {
@@ -356,6 +532,10 @@ void main() {
           reason: 'the character page does not carry it');
     }
     expect(find.byType(DevelopmentBanner), findsNothing);
+    // Not connected, so the composer says how to connect rather than invite a
+    // hello nobody will answer.
+    expect(find.text('Connect the development service to ask'), findsOneWidget);
+    expect(find.text(_hint), findsNothing);
     // Past the startup deadline: with no host the handshake waits for an
     // engine that is never going to start.
     await tester.pump(const Duration(seconds: 31));
