@@ -85,7 +85,11 @@ class AvatarBridge extends ChangeNotifier {
   /// it. Checking here too means an id the service invented is dropped before
   /// it reaches the native boundary, rather than tearing the room down on a
   /// rejection.
-  static const cosmetics = {'default', 'sunset', 'dune', 'midnight'};
+  static const cosmetics = {
+    'default', 'sunset', 'dune', 'midnight', // colourways of the original model
+    'casual', 'cowboy', 'astronaut', 'arab-thobe', 'explorer',
+    'gardener', // outfits
+  };
 
   /// A burst of taps must not become an animation backlog.
   static const reactionQueueLimit = 3;

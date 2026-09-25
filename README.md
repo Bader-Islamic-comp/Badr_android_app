@@ -19,7 +19,7 @@ implemented.
 |---|---|
 | `lib/` | Application source: `bridge/`, `data/`, `domain/`, `ui/` |
 | `assets/` | Runtime assets only — the static preview, the shared room backdrop and the Robert character package |
-| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus from the emulator `room-on-device.png`, `customization-tab.png`, `thinking-bubble.png`, `grounded-answer.png`, `redirect-reply.png`, and the casual-chat set `chat-reply.png`, `chat-invitation.png`, `chat-feeling.png` and `faith-abstain.png` |
+| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus from the emulator `room-on-device.png`, `customization-tab.png`, `thinking-bubble.png`, `grounded-answer.png`, `redirect-reply.png`, and the casual-chat set `chat-reply.png`, `chat-invitation.png`, `chat-feeling.png` and `faith-abstain.png`, and the outfit set `style-outfits.png`, `outfit-thobe.png` and `outfit-cowboy.png` |
 | `unity/` | The Unity character-room project, its room builder and its test scripts |
 | `archive/` | Untracked: superseded character revisions and the packaged distributable |
 | `contracts/` | Versioned API and bridge schemas shared with `comp-server` |
@@ -227,7 +227,11 @@ service.
 
 Looks are earned and worn through the service, never on the device. **Style**
 shows the catalogue with its price, what is earned, what is worn and how many
-more stars a locked look needs. Earning posts to `/v1/cosmetics/claim` and then
+more stars a locked look needs. There are two kinds: colourways of the original
+model (shown as a colour dot) and six modelled outfits — Casual, Gardener, Arab
+Thobe, Explorer, Cowboy and Astronaut — shown with a rendered thumbnail from
+`assets/looks/` (`design/style-outfits.png`). Wearing an outfit swaps Robert's
+model in the room (`design/outfit-thobe.png`, `design/outfit-cowboy.png`). Earning posts to `/v1/cosmetics/claim` and then
 re-reads the balance rather than subtracting locally; wearing re-checks
 ownership and writes `/v1/equipped-cosmetics`. Claim and equip keys are per
 look, so a retry reuses its own key and no look is answered with another's

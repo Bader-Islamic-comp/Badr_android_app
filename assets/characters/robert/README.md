@@ -32,6 +32,23 @@ For Unity, follow [unity/README.md](unity/README.md). The helper can accept a Te
 
 `animations.json` describes frame durations in milliseconds, relative to its own directory. It is engine-independent reference data, not a glTF animation or an automatically imported Unity asset. The Unity helper clips are configured in the Inspector. Talking is a sample frame cycle, not audio lip-sync. Whole-face PNGs cannot independently layer blinking and speech; the supplied `talk_blink.png` demonstrates a combined frame.
 
+## Skins
+
+Besides `default`, six outfit skins are supplied and registered in
+`character.json`: `casual`, `cowboy`, `astronaut`, `arab_thobe`, `explorer` and
+`gardener`. Each carries a reshaped `Robert_Body`, a separate `Robert_Outfit`
+garment mesh and the shared `FaceScreen`, on the default rig with the same four
+clips. Their previews are rendered from each skin's own scene with
+`tools/render_skin_preview.py` (Cycles, the scene camera, 700 px), which can
+also write the downscaled thumbnail the app's Style tab shows:
+
+```
+blender -b skins/cowboy/source/Robert.blend --python tools/render_skin_preview.py -- previews/cowboy.png ../../looks/cowboy.png 256
+```
+
+The Unity room and the app use the cosmetic id, which is the folder name with
+`_` written `-` (`arab-thobe`); see `../../../unity/README.md` (*Outfits*).
+
 ## Add skins later
 
 1. Copy `skins/default` to `skins/<unique_id>` and edit the new `skin.json`, or use the template.

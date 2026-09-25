@@ -44,6 +44,9 @@ $null = $wardrobe.Receive($init)
 $earned = $wardrobe.Receive((Envelope 'avatar.set_cosmetics' @{cosmeticId='sunset'} 1))
 Check ($earned.Accepted -and $earned.NeedsAcknowledgement) 'An earned catalogue look is accepted'
 Check (!$wardrobe.Receive((Envelope 'avatar.set_cosmetics' @{cosmeticId='SUNSET'} 2)).Accepted) 'Catalogue ids are matched exactly'
+$outfit = $wardrobe.Receive((Envelope 'avatar.set_cosmetics' @{cosmeticId='arab-thobe'} 3))
+Check ($outfit.Accepted -and $outfit.NeedsAcknowledgement) 'A modelled outfit is a catalogue look'
+Check (!$wardrobe.Receive((Envelope 'avatar.set_cosmetics' @{cosmeticId='arab_thobe'} 4)).Accepted) 'An asset folder name is not a cosmetic id'
 $avatar.AcceptCommands = $false
 $before = $avatar.Calls
 Check ($session.Receive((Envelope 'avatar.play' @{animation='Wave'} 136)).Reason -eq 'presentation_rejected' -and $avatar.Calls -eq $before) 'Paused/rejected presentation does not falsely signal asset failure'

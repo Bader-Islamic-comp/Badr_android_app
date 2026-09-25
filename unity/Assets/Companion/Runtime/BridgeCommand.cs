@@ -33,7 +33,8 @@ namespace Companion.Presentation
         /// reaching the presentation layer.
         /// </summary>
         public static readonly string[] Cosmetics = {
-            "default", "sunset", "dune", "midnight"
+            "default", "sunset", "dune", "midnight",
+            "casual", "cowboy", "astronaut", "arab-thobe", "explorer", "gardener"
         };
 
         private readonly string messageId;

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:companion_mobile/bridge/avatar_bridge.dart';
 import 'package:flutter/services.dart';
@@ -135,6 +136,34 @@ void main() {
     messenger.setMockMethodCallHandler(commands, null);
     messenger.setMockMethodCallHandler(
         const MethodChannel('test/ready_events'), null);
+  });
+
+  test(
+      'the allowlist is exactly the looks the bridge schema lets the room install',
+      () {
+    // The room refuses anything outside the shared schema, so a look the app
+    // would send but the room would not install is a bug on one side.
+    final schema = jsonDecode(
+        File('contracts/avatar-bridge-v1.schema.json').readAsStringSync());
+    final allowed = <String>{};
+    void collect(dynamic node) {
+      if (node is Map) {
+        final properties = node['properties'];
+        if (properties is Map && properties['cosmeticId'] is Map) {
+          allowed.addAll(
+              (properties['cosmeticId']['enum'] as List).cast<String>());
+        }
+        node.values.forEach(collect);
+      } else if (node is List) {
+        node.forEach(collect);
+      }
+    }
+
+    collect(schema);
+    expect(AvatarBridge.cosmetics, allowed);
+    // Skin folders are written with `_`; cosmetic ids never are.
+    expect(AvatarBridge.cosmetics, contains('arab-thobe'));
+    expect(AvatarBridge.cosmetics, isNot(contains('arab_thobe')));
   });
 
   test('invalid high-sequence events cannot poison later valid handshake',

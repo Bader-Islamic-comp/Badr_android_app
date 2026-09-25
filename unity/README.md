@@ -18,10 +18,10 @@ time, memory, frame time, ARM64, TalkBack and rotation remain unmeasured.
 
 | Source | State |
 |---|---|
-| `Assets/Companion/Runtime/BridgeCommand.cs` | Compiles; **executed** by 36 engine-free checks and the EditMode suite |
-| `Assets/Companion/Runtime/BridgeSession.cs` | Compiles; **executed** by 36 engine-free checks and the EditMode suite |
+| `Assets/Companion/Runtime/BridgeCommand.cs` | Compiles; **executed** by 38 engine-free checks and the EditMode suite |
+| `Assets/Companion/Runtime/BridgeSession.cs` | Compiles; **executed** by 38 engine-free checks and the EditMode suite |
 | `Assets/Companion/Runtime/CompanionBridgeReceiver.cs` | Compiles; **executed** by 12 EditMode tests |
-| `Assets/Companion/Runtime/RobertAvatarPresentation.cs` | Compiles; its scene renders on an emulator and an equipped look recolours the character there. Emotions and one-shot clips are exercised only through the session core |
+| `Assets/Companion/Runtime/RobertAvatarPresentation.cs` | Compiles; its scene renders on an emulator, an equipped colour look recolours the character there, and an equipped outfit swaps in its model (thobe → cowboy → Sunset Copper verified). Emotions and one-shot clips are exercised only through the session core |
 | `Assets/Companion/Runtime/RoomBackdrop.cs` | Compiles; its quad renders on an emulator. No aspect other than the emulator's has been seen |
 | `Assets/Companion/Runtime/AndroidUnityEventTransport.cs` | Compiles; **executed** on an emulator — its events reach Flutter and the handshake completes |
 | `../android/.../UnityRoomPlugin.kt`, `UnityRuntime.kt`, `MainActivity.kt` | Compiles into debug and release APKs; runs on an emulator |
@@ -166,13 +166,39 @@ canonical scene's camera, lights and studio floor are for renders, and the room
 builds its own. Blender writes one take per action, which Unity names
 `Robert_Rig|Idle`, so the builder matches on the action name.
 
+### Outfits
+
+Six modelled outfits come from the canonical package's `skins/` folders. Each
+is a whole skin: a reshaped `Robert_Body`, a separate `Robert_Outfit` garment
+mesh and the same `FaceScreen`, all skinned to the default 24-bone rig with the
+same four clips. `tools/export_robert_fbx.py` now keeps `Robert_Outfit`, and
+exports each one to `Assets/Companion/Character/Skins/<id>/Robert.fbx`:
+
+```powershell
+& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b ..\assets\characters\robert\skins\cowboy\source\Robert.blend `
+  --python tools\export_robert_fbx.py -- "$PWD\Assets\Companion\Character\Skins\cowboy\Robert.fbx"
+```
+
+The cosmetic id is the folder name with `_` written `-` (`arab_thobe` →
+`arab-thobe`), because cosmetic ids are letters, digits and hyphens everywhere
+they travel. The builder lists the outfits in `CompanionRoomBuilder.Outfits`,
+refuses any whose rig differs from the default's transform for transform,
+makes `RobertSkin_<id>.prefab` and `.asset` for each with the shared face
+material and Animator, wires them into the presentation's `outfits`, and frames
+the camera around all of them so a hat is never cropped. Adding an outfit means
+exporting its FBX, adding its id to that list, to `BridgeCommand.Cosmetics`, to
+the bridge schema, to the Flutter allowlist and to the service's catalogue; the
+catalogue and allowlist tests in both repositories fail when they disagree.
+
 ## Flutter/native boundary
 
 `CompanionBridgeReceiver.ReceiveMessage(string)` is the entry point for Unity
 native messaging. Commands use the shared v1 contract in
 `../contracts/avatar-bridge-v1.schema.json`. Only Robert is accepted, and only
-the looks the room was built with: `default`, `sunset`, `dune` and `midnight`,
-allowlisted in `BridgeCommand.Cosmetics` and matched exactly. Input is bounded to 4096 characters and parsed with a strict
+the looks the room was built with — the colourways `default`, `sunset`, `dune`
+and `midnight`, and the outfits `casual`, `cowboy`, `astronaut`, `arab-thobe`,
+`explorer` and `gardener` — allowlisted in `BridgeCommand.Cosmetics` and
+matched exactly. Input is bounded to 4096 characters and parsed with a strict
 allowlist: extra or duplicate fields, unsupported commands, malformed UUIDs,
 unsupported versions, fractional or negative sequences, unknown cosmetics, and
 any field carrying child text or audio all fail before presentation changes.
@@ -194,10 +220,11 @@ evicted messages are still refused by the sequence watermark.
 
 Initialization selects neutral face, Idle and the current look. Equipment
 cannot grant ownership — Flutter sends a look only after the service has
-recorded that it was earned and worn. A look currently recolours every renderer
-of the installed visual except the face screen, which keeps its approved art;
-the skin system already swaps whole model prefabs, so modelled garments arrive
-later as new skin definitions without changing this contract. A cue rejected while paused
+recorded that it was earned and worn. An outfit swaps in its own model through
+the skin controller; a colourway puts the original model back if an outfit was
+worn and recolours every renderer except the face screen, which keeps its
+approved art. Outfits are never tinted. After a swap the new model starts
+neutral and idle, and stays frozen if the room is paused. See *Outfits* below. A cue rejected while paused
 answers `presentation_rejected`, never `asset_unavailable`, and leaves the
 watermark untouched so the sender can reuse that sequence.
 

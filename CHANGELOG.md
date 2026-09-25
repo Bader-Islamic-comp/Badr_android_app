@@ -6,6 +6,86 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-09-25 (outfits)
+
+Six modelled outfits for Robert, from the skins added to the character
+package: **Casual, Cowboy, Astronaut, Arab Thobe, Explorer and Gardener**. They
+join the three colourways in one catalogue, are earned with learning stars like
+any look, and are worn in the Unity room by swapping in the outfit's own model.
+The paired server entry is in `comp-server/CHANGELOG.md`.
+
+### Character package (`assets/characters/robert/`)
+
+- The six skins (`skins/<folder>/` with `skin.json`, `model/Robert.glb` and
+  `source/Robert.blend`) are committed as supplied and registered in
+  `character.json`. Each has a reshaped `Robert_Body`, a separate
+  `Robert_Outfit` garment mesh and the shared `FaceScreen`; all six carry the
+  default 24-bone rig exactly and the same Idle, Wave, Nod and Celebrate clips
+  (checked in background Blender before anything was built).
+- `previews/<folder>.png`, which each `skin.json` already referenced, are now
+  rendered: `tools/render_skin_preview.py` renders a skin from its own scene
+  camera and lights with the same Cycles settings as `build_robert.py`, and
+  writes a 256 px thumbnail for the app.
+
+### Unity room
+
+- `tools/export_robert_fbx.py` keeps `Robert_Outfit`; each outfit is exported
+  to `Assets/Companion/Character/Skins/<id>/Robert.fbx`. The cosmetic id is the
+  folder name with `_` written `-` (`arab_thobe` → `arab-thobe`), because
+  cosmetic ids are letters, digits and hyphens everywhere they travel (the
+  app's identifier check refuses `_`).
+- `CompanionRoomBuilder` builds a prefab and skin definition per outfit
+  (`Generated/RobertSkin_<id>.*`) with the shared face material and Animator,
+  refuses an outfit whose rig differs from the default's transform for
+  transform, frames the camera around every look so a hat is never cropped,
+  and wires the outfits into the presentation.
+- `RobertAvatarPresentation`: an outfit id swaps in that skin through
+  `RobertSkinController`, and success is judged by what is actually worn
+  afterwards, since the controller falls back to the default skin. A
+  colourway puts the original model back first, then tints it. Outfits are
+  never tinted. A swapped-in model starts neutral and idle and stays frozen
+  while paused. Initialization re-resolves the Animator after re-applying the
+  look, because an outfit replaces it.
+- `BridgeCommand.Cosmetics` and the shared `contracts/avatar-bridge-v1.schema.json`
+  (byte-identical in both repositories) list all ten looks.
+
+### App
+
+- `AvatarBridge.cosmetics` lists all ten looks. A new test reads the bridge
+  schema and fails if the allowlist and the schema ever differ.
+- **Style** shows outfits with their rendered thumbnail (`assets/looks/`,
+  declared in `pubspec.yaml`) where colourways show a colour dot; the slot is
+  56 px for both. The explanation card now reads "What a look changes: Colour
+  looks recolour Robert in the character room. Outfits give him new clothes,
+  like a hat, a vest or boots. Either way his face stays as it is, and every
+  look is earned the same way: with learning stars."
+
+### Verification
+
+- Flutter: 86 → **88 tests**, analysis clean. Bridge core checks: 36 → **38**
+  (an outfit is a catalogue look; the folder name `arab_thobe` is not). Unity
+  EditMode: **12/12**. The room builds in batch mode with all six outfits and
+  the x86_64 Android export succeeds.
+- On the Android 16 emulator, against a development harness seeded with 200
+  learning stars (only the orientation lesson grants stars in the demo): the
+  Style tab lists all ten looks with thumbnails; Arab Thobe, then Cowboy, were
+  earned and worn and the room swapped models each time; wearing Sunset Copper
+  afterwards restored the original model in copper. See
+  `design/style-outfits.png`, `design/outfit-thobe.png` and
+  `design/outfit-cowboy.png`.
+
+### Known gaps
+
+- Only three of the six outfits (thobe, cowboy, and astronaut's thumbnail)
+  were looked at on the emulator; the other outfits are verified by the
+  build's rig check and the previews, not by eye in the room.
+- The cowboy hat is small and sits on the head's top edge, as authored; the
+  art is reproduced faithfully rather than adjusted.
+- No physical device, ARM64 export, frame-time or memory measurement: six
+  more models add to the room's download and load time, unmeasured.
+- The demo still grants only 5 stars, so outfits cannot be earned in the
+  normal demo flow without more lessons.
+
 ## Unreleased — 2026-09-25 (casual chat)
 
 Commit `c6419b6` ("Show Robert's casual chat replies") on branch

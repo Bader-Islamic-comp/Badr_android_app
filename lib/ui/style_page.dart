@@ -62,14 +62,14 @@ class StylePage extends StatelessWidget {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Icon(Icons.brush_outlined, color: orange),
               SizedBox(height: 12),
-              Text('What a look changes today',
+              Text('What a look changes',
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
               SizedBox(height: 8),
               Text(
-                  'Each look recolours Robert in the character room and leaves '
-                  'his face as it is. Modelled outfits need authored art and an '
-                  'asset integrity check; they will arrive as new entries in '
-                  'this same catalogue, without changing how they are earned.'),
+                  'Colour looks recolour Robert in the character room. Outfits '
+                  'give him new clothes, like a hat, a vest or boots. Either way '
+                  'his face stays as it is, and every look is earned the same '
+                  'way: with learning stars.'),
             ]),
           ),
           const SizedBox(height: 16),
@@ -128,20 +128,39 @@ class StylePage extends StatelessWidget {
     );
   }
 
-  /// The earned looks show the colour they install. `default` restores the
-  /// model's own colours, so it shows a mark rather than claiming one colour.
+  /// Colour looks show the colour they install; outfits show a render of
+  /// Robert wearing them, because an outfit changes his shape and a colour dot
+  /// cannot show that. `default` restores the model's own colours, so it shows
+  /// a mark rather than claiming one colour. The picture is decorative: the
+  /// look's name follows it.
   Widget _swatch(Cosmetic cosmetic) {
+    final preview = cosmeticPreviews[cosmetic.id];
+    if (preview != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.asset(preview,
+            width: 56,
+            height: 56,
+            fit: BoxFit.cover,
+            excludeFromSemantics: true),
+      );
+    }
     final colour = cosmeticSwatches[cosmetic.id];
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-          color: colour ?? sage,
-          shape: BoxShape.circle,
-          border: Border.all(color: hairline)),
-      child: colour == null
-          ? const Icon(Icons.auto_awesome_rounded, size: 22, color: teal)
-          : null,
+    return SizedBox.square(
+      dimension: 56,
+      child: Center(
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+              color: colour ?? sage,
+              shape: BoxShape.circle,
+              border: Border.all(color: hairline)),
+          child: colour == null
+              ? const Icon(Icons.auto_awesome_rounded, size: 22, color: teal)
+              : null,
+        ),
+      ),
     );
   }
 

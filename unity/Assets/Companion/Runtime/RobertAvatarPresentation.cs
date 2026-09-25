@@ -27,16 +27,20 @@ namespace Companion.Presentation
             "app.pause", "app.resume"
         };
 
+        [Tooltip("Modelled outfits, each a whole skin whose Stable Id is the cosmetic id " +
+                 "the bridge allowlists. Written by the room builder.")]
+        [SerializeField] private RobertSkinDefinition[] outfits = new RobertSkinDefinition[0];
+
         /// <summary>
-        /// The look each earned cosmetic installs, keyed by the ids the bridge
-        /// allowlists. The catalogue is fixed in the build: the room grants no
-        /// ownership and never invents an entry, so an id that is not here is
-        /// declined rather than approximated.
+        /// The colourways of the original model, keyed by the ids the bridge
+        /// allowlists. Together with <see cref="outfits"/> this is the whole
+        /// catalogue, fixed in the build: the room grants no ownership and
+        /// never invents an entry, so an id in neither is declined rather than
+        /// approximated.
         ///
-        /// Each look currently recolours the body and leaves the face screen
-        /// alone. The skin system already swaps whole model prefabs, so
-        /// modelled garments drop in later as new skin definitions without the
-        /// bridge contract or the server catalogue changing.
+        /// A colourway recolours the original model and leaves the face screen
+        /// alone; an outfit swaps in its own model, which is authored in its
+        /// own colours and is never tinted.
         /// </summary>
         private static readonly Dictionary<string, Color> Looks =
             new Dictionary<string, Color>
@@ -50,6 +54,7 @@ namespace Companion.Presentation
         private static readonly int ColorProperty = Shader.PropertyToID("_Color");
         private static readonly int BaseColorProperty = Shader.PropertyToID("_BaseColor");
         private const string FaceMesh = "FaceScreen";
+        private const string DefaultSkinId = "default";
 
         private readonly Dictionary<string, Texture2D> faces = new Dictionary<string, Texture2D>();
         private Animator animator;
@@ -106,11 +111,14 @@ namespace Companion.Presentation
             {
                 case BridgeCommand.Initialize:
                     paused = false;
-                    current.speed = 1f;
                     // Re-assert the look: initialize also runs after a room is
-                    // rebuilt, which installs a fresh visual at its own colours.
-                    return ApplyLook(cosmeticId) && SetFace("neutral") &&
-                           Play(current, "Idle");
+                    // rebuilt, which installs a fresh default visual. An outfit
+                    // swaps that model, so the Animator is resolved afterwards.
+                    if (!ApplyLook(cosmeticId)) return false;
+                    current = ResolveAnimator();
+                    if (current == null) return false;
+                    current.speed = 1f;
+                    return SetFace("neutral") && Play(current, "Idle");
                 case "avatar.play":
                     // A cue arriving while paused is declined, not an error.
                     return !paused && Play(current, command.Animation);
@@ -145,15 +153,32 @@ namespace Companion.Presentation
         }
 
         /// <summary>
-        /// Recolours the body of whatever visual is installed. The face screen
-        /// is skipped: it is an unlit display of approved art, and tinting it
-        /// would change what the face reads as.
+        /// Installs a look: an outfit's own model, or the original model in a
+        /// colourway. Colourways recolour the body only; the face screen is an
+        /// unlit display of approved art, and tinting it would change what the
+        /// face reads as.
         /// </summary>
         private bool ApplyLook(string requested)
         {
+            if (requested == null || skinController == null) return false;
+            RobertSkinDefinition outfit = FindOutfit(requested);
+            if (outfit != null)
+            {
+                if (!Wear(outfit)) return false;
+                cosmeticId = requested;
+                return true;
+            }
+
             Color tint;
-            if (requested == null || !Looks.TryGetValue(requested, out tint)) return false;
-            RobertFacePlayer player = skinController == null ? null : skinController.FacePlayer;
+            if (!Looks.TryGetValue(requested, out tint)) return false;
+            // A colourway belongs to the original model, so an outfit comes
+            // off first; SelectSkin(null) is the controller's default skin.
+            if (!IsWearing(DefaultSkinId) && (!skinController.SelectSkin(null) || !IsWearing(DefaultSkinId)))
+            {
+                return false;
+            }
+            RefreshVisual();
+            RobertFacePlayer player = skinController.FacePlayer;
             if (player == null) return false;
 
             bool applied = false;
@@ -177,6 +202,51 @@ namespace Companion.Presentation
             }
             if (applied) cosmeticId = requested;
             return applied;
+        }
+
+        private RobertSkinDefinition FindOutfit(string id)
+        {
+            if (outfits == null) return null;
+            foreach (RobertSkinDefinition outfit in outfits)
+            {
+                if (outfit != null && outfit.StableId == id) return outfit;
+            }
+            return null;
+        }
+
+        private bool IsWearing(string stableId)
+        {
+            RobertSkinDefinition current = skinController.CurrentSkin;
+            return current != null && current.StableId == stableId;
+        }
+
+        /// <summary>
+        /// Swaps in an outfit's model. The controller falls back to the default
+        /// skin when an outfit cannot be installed, so success is judged by what
+        /// is actually worn afterwards, never by the call's return value alone.
+        /// </summary>
+        private bool Wear(RobertSkinDefinition outfit)
+        {
+            if (skinController.CurrentSkin == outfit) return true;
+            if (!skinController.SelectSkin(outfit) || skinController.CurrentSkin != outfit) return false;
+            RefreshVisual();
+            return true;
+        }
+
+        /// <summary>
+        /// A swap replaces the model, its Animator and its face player, so the
+        /// new visual starts neutral and idle, and stays frozen if the room is
+        /// paused. Does nothing when the installed visual has not changed.
+        /// </summary>
+        private void RefreshVisual()
+        {
+            if (animator != null && boundSkin == skinController.CurrentSkin) return;
+            Animator current = ResolveAnimator();
+            if (current == null) return;
+            SetFace("neutral");
+            Play(current, "Idle");
+            current.speed = paused ? 0f : 1f;
+            if (paused) skinController.FacePlayer.StopPlayback();
         }
 
         private bool SetFace(string emotion)

@@ -168,7 +168,13 @@
                   "default",
                   "sunset",
                   "dune",
-                  "midnight"
+                  "midnight",
+                  "casual",
+                  "cowboy",
+                  "astronaut",
+                  "arab-thobe",
+                  "explorer",
+                  "gardener"
                 ]
               }
             }

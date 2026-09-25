@@ -32,7 +32,26 @@ namespace Companion.Presentation.Editor
         private const string BackdropMesh = Generated + "/RoomBackdrop.mesh";
         private const string BackdropMaterial = Generated + "/RoomBackdrop_Unlit.mat";
         private const string FaceMesh = "FaceScreen";
+        private const string Rig = "Robert_Rig";
         private static readonly string[] BodyClips = { "Idle", "Wave", "Nod", "Celebrate" };
+
+        /// <summary>
+        /// Modelled outfits, by the cosmetic id the bridge and the service use.
+        /// Each is a whole skin: the canonical package's `skins/{folder}` (a `_`
+        /// in the folder name is written `-` here, because cosmetic ids are
+        /// letters, digits and hyphens) exported to `Character/Skins/{id}/Robert.fbx`
+        /// by tools/export_robert_fbx.py. Every one must carry the default rig
+        /// exactly, so the default model's clips and Animator drive it unchanged.
+        /// </summary>
+        internal static readonly string[] Outfits =
+        {
+            "casual", "cowboy", "astronaut", "arab-thobe", "explorer", "gardener"
+        };
+
+        private static string OutfitModel(string id)
+        {
+            return "Assets/Companion/Character/Skins/" + id + "/Robert.fbx";
+        }
 
         [MenuItem("Companion/Create Robert Development Room")]
         public static void BuildRoom()
@@ -129,15 +148,7 @@ namespace Companion.Presentation.Editor
 
         private static string Build()
         {
-            ConfigureModelImporter();
-
-            GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(Model);
-            if (model == null)
-            {
-                throw new InvalidOperationException(
-                    "No imported model at " + Model + ". Regenerate it with " +
-                    "tools/export_robert_fbx.py from the canonical Blender source.");
-            }
+            GameObject model = LoadModel(Model);
 
             Dictionary<string, AnimationClip> clips = LoadBodyClips();
             Texture2D neutral = LoadFace("neutral");
@@ -151,9 +162,35 @@ namespace Companion.Presentation.Editor
             CreateBackdropAssets();
             AnimatorController controller = CreateAnimator(clips);
             Bounds framing;
-            GameObject prefab = CreatePrefab(model, faceMaterial, controller, neutral, out framing);
-            RobertSkinDefinition skin = CreateSkinDefinition(prefab, neutral);
-            string scenePath = CreateScene(skin, neutral, happy, surprised, framing);
+            GameObject prefab = CreatePrefab(
+                model, faceMaterial, controller, neutral, Generated + "/RobertSkin_default.prefab", out framing);
+            RobertSkinDefinition skin = CreateSkinDefinition(prefab, neutral, "default", SkinAsset);
+            string[] rig = RigNames(model);
+
+            // Outfits share the face material, the Animator and the default
+            // model's clips. The camera frames all of them, so a hat is never
+            // cropped by whichever look happens to be worn.
+            var outfits = new List<string>();
+            foreach (string id in Outfits)
+            {
+                GameObject outfitModel = LoadModel(OutfitModel(id));
+                string[] outfitRig = RigNames(outfitModel);
+                if (!outfitRig.SequenceEqual(rig))
+                {
+                    throw new InvalidOperationException(
+                        "Outfit '" + id + "' does not carry the default rig (" + outfitRig.Length + " vs " +
+                        rig.Length + " transforms under " + Rig + "); its clips would not drive it.");
+                }
+                Bounds bounds;
+                string asset = Generated + "/RobertSkin_" + id + ".asset";
+                GameObject outfitPrefab = CreatePrefab(
+                    outfitModel, faceMaterial, controller, neutral,
+                    Generated + "/RobertSkin_" + id + ".prefab", out bounds);
+                framing.Encapsulate(bounds);
+                CreateSkinDefinition(outfitPrefab, neutral, id, asset);
+                outfits.Add(asset);
+            }
+            string scenePath = CreateScene(skin, outfits, neutral, happy, surprised, framing);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -184,17 +221,38 @@ namespace Companion.Presentation.Editor
             importer.SaveAndReimport();
         }
 
+        private static GameObject LoadModel(string path)
+        {
+            ConfigureModelImporter(path);
+            GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (model == null)
+            {
+                throw new InvalidOperationException(
+                    "No imported model at " + path + ". Regenerate it with " +
+                    "tools/export_robert_fbx.py from the canonical Blender source.");
+            }
+            return model;
+        }
+
+        /// <summary>The rig's transform names in hierarchy order: what the clips bind to.</summary>
+        private static string[] RigNames(GameObject model)
+        {
+            Transform rig = model.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == Rig);
+            if (rig == null) throw new InvalidOperationException(model.name + " has no " + Rig + ".");
+            return rig.GetComponentsInChildren<Transform>(true).Select(t => t.name).ToArray();
+        }
+
         /// <summary>
         /// Pins the import settings the rig contract depends on, rather than
         /// inheriting whatever default the Editor happened to apply.
         /// </summary>
-        private static void ConfigureModelImporter()
+        private static void ConfigureModelImporter(string path)
         {
-            ModelImporter importer = AssetImporter.GetAtPath(Model) as ModelImporter;
+            ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
             if (importer == null)
             {
                 throw new InvalidOperationException(
-                    "No model importer for " + Model + ". Is the file present and an FBX?");
+                    "No model importer for " + path + ". Is the file present and an FBX?");
             }
             importer.animationType = ModelImporterAnimationType.Generic;
             importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
@@ -294,7 +352,7 @@ namespace Companion.Presentation.Editor
 
         private static GameObject CreatePrefab(
             GameObject model, Material faceMaterial, AnimatorController controller,
-            Texture2D neutral, out Bounds framing)
+            Texture2D neutral, string path, out Bounds framing)
         {
             framing = new Bounds(Vector3.zero, Vector3.one);
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
@@ -334,7 +392,6 @@ namespace Companion.Presentation.Editor
 
                 framing = Measure(instance);
 
-                string path = Generated + "/RobertSkin_default.prefab";
                 GameObject saved = PrefabUtility.SaveAsPrefabAsset(instance, path);
                 if (saved == null) throw new InvalidOperationException("Could not save the model prefab.");
                 return saved;
@@ -546,16 +603,17 @@ namespace Companion.Presentation.Editor
             }
         }
 
-        private static RobertSkinDefinition CreateSkinDefinition(GameObject prefab, Texture2D neutral)
+        private static RobertSkinDefinition CreateSkinDefinition(
+            GameObject prefab, Texture2D neutral, string stableId, string assetPath)
         {
             RobertSkinDefinition skin = ScriptableObject.CreateInstance<RobertSkinDefinition>();
             SerializedObject serialized = new SerializedObject(skin);
-            serialized.FindProperty("stableId").stringValue = "default";
+            serialized.FindProperty("stableId").stringValue = stableId;
             serialized.FindProperty("modelPrefab").objectReferenceValue = prefab;
             serialized.FindProperty("defaultFace").objectReferenceValue = neutral;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
-            AssetDatabase.CreateAsset(skin, SkinAsset);
+            AssetDatabase.CreateAsset(skin, assetPath);
             // Flush before the scene is replaced: opening a new scene
             // invalidates references to assets that are still only in memory,
             // which silently serialises as a null reference.
@@ -580,8 +638,8 @@ namespace Companion.Presentation.Editor
         }
 
         private static string CreateScene(
-            RobertSkinDefinition skin, Texture2D neutral, Texture2D happy, Texture2D surprised,
-            Bounds framing)
+            RobertSkinDefinition skin, List<string> outfitAssets, Texture2D neutral, Texture2D happy,
+            Texture2D surprised, Bounds framing)
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -642,7 +700,25 @@ namespace Companion.Presentation.Editor
             serializedPresentation.FindProperty("neutralFace").objectReferenceValue = neutral;
             serializedPresentation.FindProperty("happyFace").objectReferenceValue = happy;
             serializedPresentation.FindProperty("surprisedFace").objectReferenceValue = surprised;
+            // Re-resolved by path, like the default skin: the scene switch
+            // invalidates the instances created before it.
+            SerializedProperty outfits = serializedPresentation.FindProperty("outfits");
+            outfits.arraySize = outfitAssets.Count;
+            for (int i = 0; i < outfitAssets.Count; i++)
+            {
+                RobertSkinDefinition outfit = AssetDatabase.LoadAssetAtPath<RobertSkinDefinition>(outfitAssets[i]);
+                if (outfit == null) throw new InvalidOperationException("Lost outfit " + outfitAssets[i] + ".");
+                outfits.GetArrayElementAtIndex(i).objectReferenceValue = outfit;
+            }
             serializedPresentation.ApplyModifiedPropertiesWithoutUndo();
+            SerializedProperty saved = serializedPresentation.FindProperty("outfits");
+            for (int i = 0; i < saved.arraySize; i++)
+            {
+                if (saved.GetArrayElementAtIndex(i).objectReferenceValue == null)
+                {
+                    throw new InvalidOperationException("The generated scene left outfit " + i + " unassigned.");
+                }
+            }
             foreach (string field in new[] { "skinController", "neutralFace", "happyFace", "surprisedFace" })
             {
                 Require(serializedPresentation, field);

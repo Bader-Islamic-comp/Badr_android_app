@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "casual",
+  "display_name": "Casual",
+  "path_base": "character_root",
+  "rig_contract": "robert-rig-v1",
+  "model": "skins/casual/model/Robert.glb",
+  "source": "skins/casual/source/Robert.blend",
+  "preview": "previews/casual.png",
+  "face_set": "shared/faces/default/animations.json",
+  "face_binding": {
+    "mesh": "FaceScreen",
+    "material": "FaceScreen_Unlit",
+    "uv_set": 0,
+    "texture_size": [
+      1024,
+      512
+    ],
+    "opaque": true
+  },
+  "body_clips": [
+    "Idle",
+    "Wave",
+    "Nod",
+    "Celebrate"
+  ],
+  "outfit_mesh": "Robert_Outfit",
+  "presentation_only": true
+}

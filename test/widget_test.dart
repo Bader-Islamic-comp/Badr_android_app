@@ -9,6 +9,7 @@ import 'package:companion_mobile/domain/models.dart';
 import 'package:companion_mobile/main.dart';
 import 'package:companion_mobile/theme.dart';
 import 'package:companion_mobile/ui/character_stage.dart';
+import 'package:companion_mobile/ui/style_page.dart';
 import 'package:companion_mobile/ui/talk_page.dart';
 import 'package:companion_mobile/ui/widgets.dart';
 import 'package:flutter/material.dart';
@@ -919,5 +920,47 @@ void main() {
 
     await tester.pumpWidget(const SizedBox());
     model.dispose();
+  });
+
+  testWidgets(
+      'an outfit shows Robert wearing it; a colour look shows its colour',
+      (tester) async {
+    final model = CompanionController(DemoApi(const DemoConfig()))
+      ..cosmetics = const [
+        Cosmetic(
+            id: 'sunset',
+            characterId: 'robert',
+            name: 'Sunset Copper',
+            description: 'Warm copper.',
+            cost: 5,
+            owned: false,
+            equipped: false),
+        Cosmetic(
+            id: 'cowboy',
+            characterId: 'robert',
+            name: 'Cowboy',
+            description: 'A vest, jeans and boots.',
+            cost: 25,
+            owned: false,
+            equipped: false),
+      ];
+    addTearDown(model.dispose);
+    await tester.pumpWidget(MaterialApp(
+        theme: companionTheme(),
+        home: Scaffold(body: StylePage(model: model, onEquipped: () {}))));
+    await tester.pump();
+
+    bool preview(Widget widget, String asset) =>
+        widget is Image &&
+        widget.image is AssetImage &&
+        (widget.image as AssetImage).assetName == asset;
+    expect(
+        find.byWidgetPredicate(
+            (widget) => preview(widget, 'assets/looks/cowboy.png')),
+        findsOneWidget);
+    // Colour looks keep their dot; only outfits carry a picture.
+    expect(find.byWidgetPredicate((widget) => widget is Image), findsOneWidget);
+    expect(find.text('Cowboy'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
