@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../bridge/avatar_bridge.dart';
 import '../bridge/avatar_room.dart';
 import '../domain/companion_controller.dart';
+import '../domain/models.dart';
 import '../theme.dart';
 import 'character_stage.dart';
-import 'widgets.dart';
 
 /// The character-first main page.
 ///
@@ -64,76 +64,168 @@ class TalkPage extends StatelessWidget {
                   constraints: BoxConstraints(maxHeight: replyLimit),
                   child: reply)
             else
-              Expanded(child: reply),
+              // Keeps a short bubble against the composer when the reply has
+              // the whole page.
+              Expanded(
+                  child:
+                      Align(alignment: Alignment.bottomCenter, child: reply)),
           ]);
         },
       );
 
-  /// The last answer and nothing else, sitting just above the composer. With no
-  /// answer there is no bubble at all — an empty page is the character's.
-  /// `reverse` keeps a short bubble against the composer and lets a long answer
-  /// scroll from its end.
+  /// What each kind of reply is called above its text, and in what colour.
+  ///
+  /// Only the service's own answer type decides this. The wording stays calm
+  /// for every kind: not being sure, or being pointed to a grown-up, is not a
+  /// mistake the child made, and the safeguarding label is deliberately in the
+  /// steady ink colour rather than an alert one.
+  static (String, Color) labelFor(ReplyType type) => switch (type) {
+        ReplyType.grounded || ReplyType.reviewedAnswer => (
+            'From Robert’s library',
+            teal
+          ),
+        ReplyType.abstained => ('Robert isn’t sure', muted),
+        ReplyType.redirected => ('Let’s ask a grown-up', orange),
+        ReplyType.safety => ('You can talk to a grown-up you trust', ink),
+        ReplyType.unavailable => ('Service response', teal),
+      };
+
+  /// The last reply and nothing else, sitting just above the composer. With no
+  /// reply there is no bubble at all — an empty page is the character's.
+  ///
+  /// While Robert is thinking, the bubble says so in place of the old reply.
+  /// A long reply scrolls from its beginning: grounded answers run to 1,200
+  /// characters with their sources underneath, and a child should land on the
+  /// first sentence, not on the sources.
   Widget _reply(BuildContext context) {
-    final answer = model.answer;
+    final reply = model.reply;
+    final waiting = model.waitingForReply;
     // Clearing stays reachable whenever a server conversation exists, not only
-    // when an answer is on screen: a send that failed leaves one behind, and
+    // when a reply is on screen: a send that failed leaves one behind, and
     // deleting it is the whole point of the control.
     final clearable = model.hasConversation || model.canRetryQuestion;
-    if (answer == null && !clearable) return const SizedBox.shrink();
-    return ListView(
-      reverse: true,
-      shrinkWrap: true,
+    if (!waiting && reply == null && !clearable) return const SizedBox.shrink();
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      children: [
-        Semantics(
-          liveRegion: answer != null,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 520),
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: hairline),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(6),
-                    topRight: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
-                  )),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _bubbleHeader(answer),
-                    if (answer == null)
-                      // A conversation exists but its answer is gone: all this
-                      // bubble is for now is the control that deletes it.
-                      const Text('Nothing to show from this conversation.',
-                          style: TextStyle(fontSize: 15, color: muted))
-                    else
-                      Text(answer,
-                          style: Theme.of(context).textTheme.bodyLarge),
-                  ]),
-            ),
+      child: Semantics(
+        liveRegion: waiting || reply != null,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 520),
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: hairline),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(6),
+                  topRight: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                )),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _bubbleHeader(waiting ? null : reply),
+                  if (waiting)
+                    _thinking(context)
+                  else if (reply == null)
+                    // A conversation exists but its reply is gone: all this
+                    // bubble is for now is the control that deletes it.
+                    const Text('Nothing to show from this conversation.',
+                        style: TextStyle(fontSize: 15, color: muted))
+                  else ...[
+                    Text(reply.text,
+                        style: Theme.of(context).textTheme.bodyLarge),
+                    if (reply.type.cited && reply.sources.isNotEmpty)
+                      _sources(reply.sources),
+                  ],
+                ]),
           ),
         ),
-      ],
+      ),
     );
   }
 
-  /// Clearing is the one control that belongs beside the reply: it removes the
-  /// answer and asks the service to delete the conversation it came from.
-  Widget _bubbleHeader(String? answer) => Row(children: [
-        Expanded(
-            child: answer == null
-                ? const SizedBox.shrink()
-                : const SectionLabel('Service response', color: teal)),
-        IconButton(
-          tooltip: 'Clear development conversation',
-          visualDensity: VisualDensity.compact,
-          onPressed: model.busy ? null : model.clearConversation,
-          icon: const Icon(Icons.close_rounded, size: 20),
+  /// Says Robert is working on it, in place of the old reply. It only mentions
+  /// the library when the service has one switched on.
+  Widget _thinking(BuildContext context) => Row(children: [
+        SizedBox.square(
+          dimension: 18,
+          child: MediaQuery.disableAnimationsOf(context)
+              // Animation is never needed to understand the page.
+              ? const Icon(Icons.auto_stories_outlined, size: 18, color: teal)
+              : const CircularProgressIndicator(strokeWidth: 2, color: teal),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+              model.groundedAnswers
+                  ? 'Robert is looking in his library…'
+                  : 'Robert is thinking…',
+              style: const TextStyle(fontSize: 15, color: muted)),
         ),
       ]);
+
+  /// Where a library reply came from, under its text. Plain text rather than
+  /// links: there is nothing on the phone to open.
+  Widget _sources(List<ReplySource> sources) => Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.only(top: 10),
+        width: double.infinity,
+        decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: hairline))),
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Sources',
+                  style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700, color: muted)),
+              for (final source in sources)
+                MergeSemantics(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(source.title,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: ink)),
+                          Text(source.reference,
+                              style:
+                                  const TextStyle(fontSize: 13, color: muted)),
+                        ]),
+                  ),
+                ),
+            ]),
+      );
+
+  /// Clearing is the one control that belongs beside the reply: it removes the
+  /// reply and asks the service to delete the conversation it came from. It
+  /// stays usable while Robert is thinking, which also stops the wait.
+  Widget _bubbleHeader(Reply? reply) {
+    final label = reply == null ? null : labelFor(reply.type);
+    return Row(children: [
+      Expanded(
+          child: label == null
+              ? const SizedBox.shrink()
+              : Text(label.$1,
+                  style: TextStyle(
+                      color: label.$2,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      letterSpacing: 0.2))),
+      IconButton(
+        tooltip: 'Clear development conversation',
+        visualDensity: VisualDensity.compact,
+        onPressed: model.canClear ? model.clearConversation : null,
+        icon: const Icon(Icons.close_rounded, size: 20),
+      ),
+    ]);
+  }
 }

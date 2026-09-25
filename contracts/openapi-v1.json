@@ -264,7 +264,6 @@
       "Features": {
         "properties": {
           "generativeAnswers": {
-            "const": false,
             "default": false,
             "title": "Generativeanswers",
             "type": "boolean"
@@ -378,21 +377,82 @@
         "title": "Rewards",
         "type": "object"
       },
-      "Turn": {
+      "Source": {
+        "description": "A cited reviewed passage: `id` resolves to one chunk of the serving release.",
         "properties": {
+          "id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{1,63}#[1-9][0-9]{0,3}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "reference": {
+            "maxLength": 500,
+            "title": "Reference",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "reference"
+        ],
+        "title": "Source",
+        "type": "object"
+      },
+      "Turn": {
+        "description": "`answerType` is null and `text` empty while pending; completed text is 1-1200 characters.",
+        "properties": {
+          "answerType": {
+            "anyOf": [
+              {
+                "enum": [
+                  "unavailable",
+                  "grounded",
+                  "reviewed_answer",
+                  "abstained",
+                  "redirected",
+                  "safety"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answertype"
+          },
           "citations": {
             "items": {
               "type": "string"
             },
+            "maxItems": 4,
             "title": "Citations",
             "type": "array"
           },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "maxItems": 4,
+            "title": "Sources",
+            "type": "array"
+          },
           "status": {
-            "const": "completed",
+            "enum": [
+              "pending",
+              "completed"
+            ],
             "title": "Status",
             "type": "string"
           },
           "text": {
+            "maxLength": 1200,
             "title": "Text",
             "type": "string"
           },
@@ -404,8 +464,10 @@
         "required": [
           "turnId",
           "status",
+          "answerType",
           "text",
-          "citations"
+          "citations",
+          "sources"
         ],
         "title": "Turn",
         "type": "object"
@@ -413,7 +475,10 @@
       "TurnCreated": {
         "properties": {
           "status": {
-            "const": "completed",
+            "enum": [
+              "pending",
+              "completed"
+            ],
             "title": "Status",
             "type": "string"
           },

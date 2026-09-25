@@ -167,7 +167,11 @@ class _CompanionHomeState extends State<CompanionHome>
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: Column(children: [
                         if (!onCharacterPage) const DevelopmentBanner(),
-                        if (model.busy)
+                        // On the character page the thinking bubble already
+                        // says Robert is working, for as long as a reply takes;
+                        // a bar across the top of his page would say it twice.
+                        if (model.busy &&
+                            !(onCharacterPage && model.waitingForReply))
                           const Padding(
                               padding: EdgeInsets.only(top: 8),
                               child: LinearProgressIndicator(

@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:companion_mobile/bridge/avatar_bridge.dart';
 import 'package:companion_mobile/bridge/avatar_room.dart';
 import 'package:companion_mobile/data/demo_api.dart';
 import 'package:companion_mobile/domain/companion_controller.dart';
+import 'package:companion_mobile/domain/models.dart';
 import 'package:companion_mobile/main.dart';
+import 'package:companion_mobile/theme.dart';
 import 'package:companion_mobile/ui/character_stage.dart';
 import 'package:companion_mobile/ui/widgets.dart';
 import 'package:flutter/material.dart';
@@ -75,7 +78,258 @@ const _inventory = {
   ]
 };
 
+/// JSON as the service sends it; `http` reads `application/json` as UTF-8.
+http.Response _json(Object? value) => http.Response(jsonEncode(value), 200,
+    headers: {'content-type': 'application/json'});
+
+const _grounded = {
+  'turnId': 'turn-1',
+  'status': 'completed',
+  'answerType': 'grounded',
+  'text': 'You earn learning stars by finishing lessons.',
+  'citations': ['app-help-stars#1'],
+  'sources': [
+    {
+      'id': 'app-help-stars#1',
+      'title': 'How learning stars work',
+      'reference': 'Robert’s guide · part 1',
+    }
+  ],
+};
+
+/// A controller already holding a reply, to check how each kind is framed
+/// without a service.
+class _ReplyingController extends CompanionController {
+  _ReplyingController(Reply value) : super(DemoApi(const DemoConfig())) {
+    reply = value;
+  }
+}
+
+/// Lets pending work finish without advancing the fake clock.
+/// `pumpAndSettle` never settles while the thinking indicator spins.
+Future<void> _flush(WidgetTester tester) async {
+  for (var frame = 0; frame < 12; frame++) {
+    await tester.pump();
+  }
+}
+
 void main() {
+  testWidgets(
+      'Robert shows he is thinking, then answers from his library with '
+      'sources', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final handle = tester.ensureSemantics();
+    var reads = 0;
+    final waited = Completer<void>();
+    final model = CompanionController(
+      DemoApi(
+        const DemoConfig(
+            baseUrl: 'http://localhost:8000', token: 'synthetic-token'),
+        client: MockClient((request) async {
+          switch (request.url.path) {
+            case '/v1/conversations':
+              return _json({'conversationId': 'conversation-1'});
+            case '/v1/conversations/conversation-1/turns':
+              return _json({'turnId': 'turn-1', 'status': 'pending'});
+            case '/v1/turns/turn-1':
+              reads++;
+              return _json(_grounded);
+            default:
+              return http.Response('{}', 404);
+          }
+        }),
+      ),
+      // Held open by the test, never a real delay: under the tester's fake
+      // clock a real one would never finish.
+      wait: (_) => waited.future,
+    )
+      // Connection itself is covered by the controller tests.
+      ..connected = true
+      ..groundedAnswers = true;
+    await tester.pumpWidget(CompanionApp(controller: model));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'How do I earn stars?');
+    await tester.tap(find.byTooltip('Send test question'));
+    await _flush(tester);
+
+    const thinking = 'Robert is looking in his library…';
+    expect(find.text(thinking), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+        find.ancestor(
+            of: find.text(thinking),
+            matching: find.byWidgetPredicate((widget) =>
+                widget is Semantics && widget.properties.liveRegion == true)),
+        findsOneWidget,
+        reason: 'a screen reader hears that Robert is thinking');
+    // The bubble says it; a bar over Robert's page would say it twice.
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    IconButton button(String tooltip) =>
+        tester.widget<IconButton>(find.ancestor(
+            of: find.byTooltip(tooltip), matching: find.byType(IconButton)));
+    expect(button('Send test question').onPressed, isNull,
+        reason: 'nothing more can be sent while Robert is thinking');
+    expect(button('Clear development conversation').onPressed, isNotNull,
+        reason: 'but the question can always be taken back');
+    expect(reads, 0);
+
+    waited.complete();
+    await _flush(tester);
+    expect(reads, 1);
+    expect(find.text(thinking), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('From Robert’s library'), findsOneWidget);
+    expect(find.text('You earn learning stars by finishing lessons.'),
+        findsOneWidget);
+    expect(find.text('Sources'), findsOneWidget);
+    expect(find.text('How learning stars work'), findsOneWidget);
+    expect(find.text('Robert’s guide · part 1'), findsOneWidget);
+    expect(tester.getSemantics(find.text('How learning stars work')),
+        isSemantics(label: 'How learning stars work\nRobert’s guide · part 1'),
+        reason: 'each source is read as one item, and it is not a link');
+    expect(tester.takeException(), isNull);
+    handle.dispose();
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  testWidgets('clearing while Robert thinks takes the question back for good',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var reads = 0;
+    var deletes = 0;
+    final waited = Completer<void>();
+    final model = CompanionController(
+      DemoApi(
+        const DemoConfig(
+            baseUrl: 'http://localhost:8000', token: 'synthetic-token'),
+        client: MockClient((request) async {
+          switch (request.url.path) {
+            case '/v1/conversations':
+              return _json({'conversationId': 'conversation-1'});
+            case '/v1/conversations/conversation-1':
+              deletes++;
+              return http.Response('', 204);
+            case '/v1/conversations/conversation-1/turns':
+              return _json({'turnId': 'turn-1', 'status': 'pending'});
+            case '/v1/turns/turn-1':
+              reads++;
+              return _json(_grounded);
+            default:
+              return http.Response('{}', 404);
+          }
+        }),
+      ),
+      wait: (_) => waited.future,
+    )..connected = true;
+    await tester.pumpWidget(CompanionApp(controller: model));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'How do I earn stars?');
+    await tester.tap(find.byTooltip('Send test question'));
+    await _flush(tester);
+    // With grounded answers off there is no library to mention.
+    expect(find.text('Robert is thinking…'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Clear development conversation'));
+    await _flush(tester);
+    expect(deletes, 1);
+    expect(find.text('Robert is thinking…'), findsNothing);
+    expect(find.byTooltip('Clear development conversation'), findsNothing,
+        reason: 'nothing is left to clear, so the bubble is gone');
+    expect(find.text('Development conversation cleared.'), findsOneWidget);
+
+    // The wait ending afterwards neither reads the turn nor shows a reply.
+    waited.complete();
+    await _flush(tester);
+    expect(reads, 0);
+    expect(find.text('From Robert’s library'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  for (final (type, label, colour) in [
+    (ReplyType.abstained, 'Robert isn’t sure', muted),
+    (ReplyType.redirected, 'Let’s ask a grown-up', orange),
+    (ReplyType.safety, 'You can talk to a grown-up you trust', ink),
+    (ReplyType.unavailable, 'Service response', teal),
+  ]) {
+    testWidgets('a ${type.wire} reply is labelled calmly and lists no sources',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final model = _ReplyingController(Reply(
+          type: type, text: 'A fixed development reply for ${type.wire}.'));
+      await tester.pumpWidget(CompanionApp(controller: model));
+      await tester.pumpAndSettle();
+      expect(find.text(label), findsOneWidget);
+      expect(tester.widget<Text>(find.text(label)).style?.color, colour);
+      expect(find.text('A fixed development reply for ${type.wire}.'),
+          findsOneWidget);
+      expect(find.text('From Robert’s library'), findsNothing);
+      expect(find.text('Sources'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+  }
+
+  testWidgets('a long library reply on a small screen starts at its beginning',
+      (tester) async {
+    // Short enough that the reply takes the whole page instead of Robert.
+    tester.view.physicalSize = const Size(320, 480);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final text = 'Stars are for learning. ${'Keep going. ' * 90}'.trim();
+    final model = _ReplyingController(Reply(
+      type: ReplyType.grounded,
+      text: text,
+      sources: [
+        for (var part = 1; part <= 4; part++)
+          ReplySource(
+              id: 'app-help-stars#$part',
+              title: 'How learning stars work, part $part',
+              reference: 'Robert’s guide · part $part'),
+      ],
+    ));
+    await tester.pumpWidget(CompanionApp(controller: model));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CharacterStage), findsNothing);
+    final scrollView = find.ancestor(
+        of: find.text(text), matching: find.byType(SingleChildScrollView));
+    final position = tester
+        .state<ScrollableState>(
+            find.descendant(of: scrollView, matching: find.byType(Scrollable)))
+        .position;
+    expect(position.maxScrollExtent, greaterThan(0),
+        reason: 'the reply is longer than the space it has');
+    expect(position.pixels, 0);
+    // The top of the bubble is on screen, not scrolled away above the sources.
+    final viewport = tester.getRect(scrollView);
+    final start = tester.getRect(find.text('From Robert’s library'));
+    expect(start.top, greaterThanOrEqualTo(viewport.top));
+    expect(start.bottom, lessThanOrEqualTo(viewport.bottom));
+    expect(
+        tester.getRect(find.text('Sources')).top, greaterThan(viewport.bottom),
+        reason: 'the sources are below, reached by scrolling');
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
   testWidgets(
       'missing Unity host preserves offline orientation and honest rewards',
       (tester) async {

@@ -87,18 +87,28 @@ class DemoApi {
     }
   }
 
-  Future<void> bootstrap() async {
+  /// Confirms this is the development-only service and returns whether it has
+  /// grounded answers switched on.
+  ///
+  /// That is the one feature the service may report as on, and only the
+  /// service decides it: the app never turns answers on, it only learns
+  /// whether they are. Everything else stays as strict as before — voice on,
+  /// another mode or reviewed content would each mean a service this build was
+  /// not made for.
+  Future<bool> bootstrap() async {
     final result = await request('GET', '/v1/bootstrap');
+    final features = result['features'];
     if (result['mode'] != 'development' ||
         result['characterId'] != 'robert' ||
         result['profileId'] != 'demo-child' ||
         result['contentStatus'] != 'awaiting_review' ||
-        result['features'] is! Map ||
-        result['features']['voice'] != false ||
-        result['features']['generativeAnswers'] != false) {
+        features is! Map ||
+        features['voice'] != false ||
+        features['generativeAnswers'] is! bool) {
       throw const DemoApiException(
           'This app requires the development-only service.');
     }
+    return features['generativeAnswers'] as bool;
   }
 
   Future<Map<String, dynamic>> completeLesson(String key) =>

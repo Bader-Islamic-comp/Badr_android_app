@@ -111,13 +111,32 @@ class _ParentSheetState extends State<_ParentSheet> {
                     title: Text('Voice is off'),
                     subtitle:
                         Text('No microphone access or audio collection.')),
+                // Whether a model answers questions is the service's switch, so
+                // this reports it rather than offering to change it.
+                ListenableBuilder(
+                  listenable: widget.model,
+                  builder: (context, _) => widget.model.groundedAnswers
+                      ? const ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.auto_stories_outlined),
+                          title:
+                              Text('Grounded answers: on · development corpus'),
+                          subtitle: Text(
+                              'Answers come only from the service’s development '
+                              'library and show their sources. The model runs '
+                              'on the service, never on this phone.'))
+                      : const ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.auto_stories_outlined),
+                          title: Text('Grounded answers: off'),
+                          subtitle: Text('No AI model answers questions.')),
+                ),
                 const ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.menu_book_outlined),
                     title: Text('Content awaits review'),
-                    subtitle:
-                        Text('No religious curriculum or generated stories are '
-                            'published, and no AI provider is enabled.')),
+                    subtitle: Text('No religious curriculum or generated '
+                        'stories are published.')),
                 const ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.privacy_tip_outlined),

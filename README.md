@@ -134,7 +134,7 @@ Unity.
 
 ## Prepare and run
 
-Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 33 tests
+Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 81 tests
 pass. Dependency versions are recorded in `pubspec.lock`.
 
 The SDK is **vendored, not installed**: it lives beside the repositories at
@@ -216,8 +216,10 @@ authentication.
 
 Connection is user initiated from the connection card on Quests, Style or the
 parent area. The bootstrap must identify the synthetic development profile,
-disabled voice/generation and awaiting-review content. Completion, balance,
-challenge state, lessons and inventory come from the service.
+disabled voice and awaiting-review content. `features.generativeAnswers` is the
+one feature the service may report as on; the app records it and never turns it
+on, and the parent area shows which it is. Completion, balance, challenge state,
+lessons and inventory come from the service.
 
 Looks are earned and worn through the service, never on the device. **Style**
 shows the catalogue with its price, what is earned, what is worn and how many
@@ -232,9 +234,18 @@ worn — not by the tap that changed it. Earning is not wearing, so a claim alon
 tells the room nothing; and because the cue follows server state rather than a
 gesture, the worn look comes back by itself after a relaunch or a room rebuild,
 neither of which involves a tap. Write retries reuse their
-idempotency key; question retries resume a known turn. The UI fetches a complete
-validated turn with REST; it does not expose token streaming. The shared SSE
-endpoint is reserved for later resume/stream UI work.
+idempotency key; question retries resume a known turn.
+
+Questions are answered on the service, never on the phone. A turn is created
+`pending` and read again every second with REST until it completes, for at most
+90 seconds per attempt; past that Robert "is taking longer than usual", and
+trying again resumes polling the same turn rather than asking twice. The shared
+SSE endpoint is not used. A completed turn is parsed strictly against
+`comp-server/doc/rag-system.md` §7 and refused whole if it breaks a rule. The
+Talk bubble shows "Robert is looking in his library…" while waiting, then labels
+the reply by the service's answer type — only grounded and reviewed answers say
+"From Robert’s library" and list their sources, as plain text. Clearing works
+mid-wait: it stops polling, and a reply that lands afterwards is dropped.
 
 Question text stays only in memory during submission and retry. It is not logged
 or saved to disk. Clearing the conversation deletes the server conversation
@@ -244,8 +255,10 @@ or deletion.
 
 ## Verification coverage and remaining work
 
-The 33-test suite covers no-network default mode, server-owned rewards, ownership
+The 81-test suite covers no-network default mode, server-owned rewards, ownership
 rejection, idempotent completion headers, resuming known question turns,
+polling a pending turn to its deadline and resuming it, every turn-contract
+rule, clearing and disposal mid-wait, the reply labels and sources,
 sanitized failures, missing native host, malformed bridge events, cancellation of
 native deadlines on disposal, asynchronous send/delete disposal, offline
 orientation, 320px/large-text layout, the character-page visibility and
