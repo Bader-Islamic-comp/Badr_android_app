@@ -334,9 +334,12 @@ Grounded replies have also been checked across both repositories. The real
 `CompanionController` and `DemoApi` ran against the real server with grounded
 answers on, a release built with the offline hashing embedder, and a local
 stand-in for the Qwen server, with no model downloaded. The app parsed all five
-answer types that such a server returns, and clearing worked. Two checks are
-still missing: nobody has seen the new reply bubble on the emulator or a
-device, and no reply from the real model has been parsed. At 320×380 with text
+answer types that such a server returns, and clearing worked. The same client
+code then ran against the live API with the real Qwen3.5-9B generating, and
+parsed grounded replies with sources in about 2 s. One check is still missing:
+nobody has seen the new reply bubble on the emulator or a device (the
+development machine could not hold the emulator and the loaded model at once).
+At 320×380 with text
 at 2×, the composer's hint wraps and leaves the reply about 64 px.
 
 A browser check of the built web preview previously found the orientation

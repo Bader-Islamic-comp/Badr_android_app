@@ -150,9 +150,15 @@ be rendered in the hope that it is right.
   server, with no model downloaded. All five answer types that such a server
   returns (`grounded`, `reviewed_answer`, `abstained`, `redirected`, `safety`)
   parsed correctly, and clearing worked.
+- **Live run against the real Qwen3.5-9B.** The same client code, against the
+  live API with Qwen3.5-9B generating through Ollama, parsed grounded replies
+  with their sources in about 2 s (including the 1 s poll), a reviewed answer
+  in 1 s, a ruling redirect in 4 ms, and an abstention for a question the
+  corpus cannot answer. See the paired `comp-server/CHANGELOG.md` entry.
 
-Still not done: nobody has seen the new bubble on the emulator or a device, and
-no reply from the real Qwen3.5-9B has been parsed. The corpus is synthetic help
+Still not done: nobody has seen the new bubble on the emulator or a device.
+The development machine's memory commit limit did not leave room for the
+emulator while Qwen3.5-9B was loaded. The corpus is synthetic help
 text about using the app, not religious teaching, and it has not been reviewed
 for children.
 
