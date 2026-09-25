@@ -168,8 +168,8 @@ the Kotlin host in `android/app/src/main/kotlin/` compiles into both. The APK
 requests `INTERNET` only — no microphone, camera or location permission.
 
 The app has been run on an **Android 16 x86_64 emulator**: the character room
-renders, the bridge handshake completes, and an earned look sent over the bridge
-recolours the character. **No physical device has been used**, so startup, memory, frame
+renders, the bridge handshake completes, an earned colour look sent over the
+bridge recolours the character, and an earned outfit swaps in its model. **No physical device has been used**, so startup, memory, frame
 time, ARM64, TalkBack, keyboard insets and rotation are all still unmeasured,
 and no performance budget has been approved to measure against.
 

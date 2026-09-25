@@ -102,7 +102,8 @@ what is approved. `comp-mobile/CHANGELOG.md` has the increment-by-increment log.
 - The character appears on the character page only. The other pages are backed
   by the room's own backdrop image without him, so they read as the same place
   and look identical with or without a Unity room.
-- A customization tab: the service publishes a four-look catalogue with prices,
+- A customization tab: the service publishes a four-look catalogue with prices
+  (ten looks since 2026-09-25: six modelled outfits joined the colourways),
   spends stars from its own append-only ledger, and records what is owned and
   worn. Flutter offers a look only against the balance the service reported, and
   sends `avatar.set_cosmetics` from the service's own record of what is worn,
@@ -214,4 +215,7 @@ exists, feeding it the `unity.*` properties from the export's own
    covered by server and Flutter tests, including that the room is told only
    after the service confirms. On the emulator the whole loop runs: complete the
    orientation, earn Sunset Copper for five stars, wear it, and the character
-   recolours. A look is a colourway until modelled garments are authored.
+   recolours. Since 2026-09-25 six modelled outfits (Casual, Gardener, Arab
+   Thobe, Explorer, Cowboy, Astronaut) are earned and worn the same way;
+   wearing one swaps Robert's model in the room, seen on the emulator for the
+   thobe and the cowboy.

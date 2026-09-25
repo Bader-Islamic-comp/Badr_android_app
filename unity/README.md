@@ -363,7 +363,9 @@ it.
 
 **The bridge handshake completes.** The parent area's room line reads "Character
 room · playing", the greeting wave runs, and an earned look sent as
-`avatar.set_cosmetics` recolours the character in the room. That is the full
+`avatar.set_cosmetics` recolours the character in the room; since the outfits,
+an earned outfit sent the same way swaps in its model (Arab Thobe, then Cowboy,
+then back to Sunset Copper on the original model). That is the full
 path — Flutter to the host, the host to Unity, Unity's events back to Flutter —
 running on a device.
 

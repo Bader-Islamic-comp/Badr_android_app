@@ -8,7 +8,8 @@ Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 
 ## Unreleased — 2026-09-25 (outfits)
 
-Six modelled outfits for Robert, from the skins added to the character
+Commit `b12fa70` ("Add six modelled outfits Robert can earn and wear") on
+branch `feature/rag-system-and-data-pipeline`. Six modelled outfits for Robert, from the skins added to the character
 package: **Casual, Cowboy, Astronaut, Arab Thobe, Explorer and Gardener**. They
 join the three colourways in one catalogue, are earned with learning stars like
 any look, and are worn in the Unity room by swapping in the outfit's own model.
@@ -62,6 +63,9 @@ The paired server entry is in `comp-server/CHANGELOG.md`.
 
 ### Verification
 
+- Docs: `README.md`, `unity/README.md` (new *Outfits* section),
+  `assets/characters/robert/README.md`, the Android design spec and the shared
+  roadmap (§9 status note, byte-identical with comp-server) describe the ten looks.
 - Flutter: 86 → **88 tests**, analysis clean. Bridge core checks: 36 → **38**
   (an outfit is a catalogue look; the folder name `arab_thobe` is not). Unity
   EditMode: **12/12**. The room builds in batch mode with all six outfits and
