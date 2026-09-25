@@ -19,7 +19,7 @@ implemented.
 |---|---|
 | `lib/` | Application source: `bridge/`, `data/`, `domain/`, `ui/` |
 | `assets/` | Runtime assets only — the static preview, the shared room backdrop and the Robert character package |
-| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus `room-on-device.png`, `customization-tab.png`, `thinking-bubble.png`, `grounded-answer.png` and `redirect-reply.png` from the emulator |
+| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus from the emulator `room-on-device.png`, `customization-tab.png`, `thinking-bubble.png`, `grounded-answer.png`, `redirect-reply.png`, and the casual-chat set `chat-reply.png`, `chat-invitation.png`, `chat-feeling.png` and `faith-abstain.png` |
 | `unity/` | The Unity character-room project, its room builder and its test scripts |
 | `archive/` | Untracked: superseded character revisions and the packaged distributable |
 | `contracts/` | Versioned API and bridge schemas shared with `comp-server` |
@@ -294,6 +294,32 @@ hello such as "Hi, how are you?" gets a short chat reply instead. The
 server refuses any model host that is not on the operator's machine or private
 network, so no question goes to a third-party provider.
 
+**Casual chat, and faith from the corpus only.** The service decides this, not
+the app ([`comp-server/doc/conversation-policy.md`](../comp-server/doc/conversation-policy.md),
+Robert's character sheet
+[`comp-server/doc/robert-persona.md`](../comp-server/doc/robert-persona.md), and
+the boundary in
+[ADR 0004](../comp-server/doc/adr-0004-casual-conversation.md)). A faith
+question is answered only from the corpus, never from the model's memory or by
+casual chat. The development corpus has no faith lessons, so today every faith
+question comes back as "Robert isn’t sure", saying warmly that he only answers
+faith questions from lessons his teachers have checked. Small talk gets a short,
+checked reply in Robert's voice as answer type `chat`, and now and then a
+reviewed line inviting the child to explore a lesson in the Learn tab; a sad
+feeling gets a kind reply that points to a grown-up they trust, and no
+invitation. On the emulator, against the real model:
+
+| Screenshot | Message | Reply |
+|---|---|---|
+| [`design/thinking-bubble.png`](design/thinking-bubble.png) | "Hi, how are you?" | the thinking line while the service works |
+| [`design/chat-reply.png`](design/chat-reply.png) | "Hi, how are you?" | `chat`, no label, in 2.1 s |
+| [`design/chat-invitation.png`](design/chat-invitation.png) | "Can you tell me a joke?" | `chat`, with a reviewed invitation to the Learn tab |
+| [`design/chat-feeling.png`](design/chat-feeling.png) | "I am sad today" | `chat`, pointing to a grown-up they trust, no invitation |
+| [`design/faith-abstain.png`](design/faith-abstain.png) | "Who is Prophet Muhammad?" | `abstained` with the faith abstention, in 1 ms with no model call |
+
+All of this wording awaits safeguarding and scholarly review, and the Learn tab
+does not have the faith lessons the invitations point to yet.
+
 Each reply is labelled by the answer type the service sends. The app never
 infers the label from the text:
 
@@ -349,8 +375,12 @@ parsed grounded replies with sources in about 2 s. On the emulator, with Qwen
 generating, the thinking bubble, a grounded reply with its sources and a ruling
 redirect all rendered as designed (`design/thinking-bubble.png`,
 `design/grounded-answer.png`, `design/redirect-reply.png`); the emulator and the
-loaded model only fit in memory together once Steam and Chrome were closed. No
-physical device has run it yet. At 320×380 with text
+loaded model only fit in memory together once Steam and Chrome were closed.
+Casual chat was then checked the same way: a hello, a joke with an invitation, a
+sad feeling and a faith question (`design/chat-reply.png`,
+`design/chat-invitation.png`, `design/chat-feeling.png`,
+`design/faith-abstain.png`; `design/thinking-bubble.png` now shows the new
+thinking line). No physical device has run it yet. At 320×380 with text
 at 2×, the composer's hint still wraps. The shorter hint takes three lines
 rather than four and leaves the reply about 107 px rather than 56 (measured in
 the widget tester with Roboto loaded).

@@ -6,6 +6,111 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-09-25 (casual chat)
+
+Commit `c6419b6` ("Show Robert's casual chat replies") on branch
+`feature/rag-system-and-data-pipeline`. The service now gives casual messages
+such as "Hi, how are you?" a short reply in Robert's own voice, and answers
+faith questions only from its corpus, otherwise saying warmly that it has no
+checked lesson about that. All of that is decided on the service (`comp-server`
+commit `54ff6b0`): the policy is `comp-server/doc/conversation-policy.md`, the
+character sheet is `comp-server/doc/robert-persona.md`, and the boundary is
+ADR 0004 (`comp-server/doc/adr-0004-casual-conversation.md`). The app only
+learns to show the new `chat` answer type, and its own few words get a little
+of Robert's character. It is development only and off by default, the corpus
+is synthetic app help, and nothing here is reviewed for children.
+
+The product owner's request of 2026-09-25 is quoted in full in the paired
+`comp-server/CHANGELOG.md` entry: faith only from the corpus, and otherwise say
+so; friendly casual chat; a loving, charming character that encourages children
+to learn more about their faith; and log everything.
+
+### Parsing a reply
+
+- **`ReplyType.chat` (`"chat"`) is accepted.** It is not a library type
+  (`cited` is false), so it must carry no citations and no sources. A chat
+  reply that carries any is refused whole, like every other non-library reply,
+  so casual chat cannot borrow the library's authority. Every other contract
+  rule applies unchanged.
+
+### The Talk page
+
+- **Chat has no label.** The bubble holds Robert's words, with the × beside
+  them. A label says where a reply came from, and chat claims to come from
+  nowhere; left bare, it cannot be mistaken for a library reply, which is
+  always named and sourced. The reply is still a live region.
+- **One thinking line for every reply:** "Robert is thinking… his antennae are
+  wiggling", next to a spinner, or a still robot icon under reduced motion. It
+  replaces "Robert is looking in his library…" and "Robert is thinking…", and
+  the book icon. Which kind of reply is coming is the service's decision and is
+  not known yet, and a hello is not a trip to the library. The antennae are
+  Robert's own: two, orange-tipped, on the model.
+- **Composer hint** when connected: "Say hi or ask (test text only)", replacing
+  "Type a synthetic test question". It invites a hello as well as a question
+  and still says the text is only for testing. It is also shorter: at 320×380
+  with text at 2×, it wraps to three lines instead of four and leaves the reply
+  about 107 px instead of 56 (measured in the widget tester with Roboto
+  loaded).
+
+### The parent area
+
+- The "Grounded answers: on · development corpus" subtitle now reads
+  "Questions are answered only from the service’s development library, with
+  their sources. Casual chat, like a hello, gets a friendly reply without
+  sources. The model runs on the service, never on this phone." Chat is not
+  from the library, so the provenance a parent reads has to say so. The "off"
+  row is unchanged.
+
+### Contracts and shared docs
+
+- `contracts/openapi-v1.json` was regenerated from the server and is
+  byte-identical to `comp-server/contracts/openapi-v1.json`: `answerType`
+  gains `chat`, and the `Turn` description says citations and sources are empty
+  except for `grounded` and `reviewed_answer`.
+- Recorded afterwards with this entry (documentation only), and byte-identical
+  to the server's copies: `AGENTS.md` now scopes the grounding rule to answers
+  to questions, says casual chat replies (ADR 0004) pass the conversation-policy
+  checks and never carry generated faith content, and points to the policy, the
+  character sheet and ADR 0004; `doc/product-architecture-roadmap.md` gains a
+  §5.1 status note on casual chat and the faith-only rule.
+- `README.md`: the `chat` row in the label table, the new thinking line and
+  hint, and the new screenshots (below).
+
+### Verification
+
+- Flutter: 81 → **86 tests**. The new tests cover:
+  - a chat reply parsing with no sources, and not counting as a library reply
+  - a chat reply that carries sources being refused
+  - on the page: the new hint, the thinking line with a still robot icon under
+    reduced motion, and a chat reply with no label, no sources and the × still
+    usable
+  - the parent area saying that chat replies carry no sources
+  - a chat reply at 320×380 with text at 2× staying in reach
+- **On the Android emulator**, against the live API with Qwen3.5-9B
+  generating, four messages behaved as intended:
+  - "Hi, how are you?" → `chat` in 2.1 s, with no label
+    (`design/chat-reply.png`). `design/thinking-bubble.png` is replaced: it now
+    shows the new thinking line while that reply was on its way.
+  - "Who is Prophet Muhammad?" → `abstained` with the faith abstention
+    (service outcome `faith_abstain:weak_evidence`, 1 ms, no model call),
+    labelled "Robert isn’t sure" (`design/faith-abstain.png`).
+  - "Can you tell me a joke?" → `chat` with a reviewed invitation to the Learn
+    tab (`design/chat-invitation.png`).
+  - "I am sad today" → `chat` pointing to a grown-up they trust, with no
+    invitation (`design/chat-feeling.png`).
+- The service's own verification, including five runs against the real
+  Qwen3.5-9B (47/47 cases each, 65/65 chat replies passing its checks, 25/25
+  faith questions abstaining), is in `comp-server/CHANGELOG.md`.
+
+Still not done: no physical device has run chat replies. The invitations point
+to faith lessons in the Learn tab, which this development app does not have
+yet. All of Robert's new wording, on the service and in this app, awaits
+safeguarding and scholarly review.
+
+Known issues:
+- At 320×380 with text at 2×, the composer's hint still wraps (three lines),
+  leaving the reply about 107 px.
+
 ## Unreleased — 2026-09-25
 
 Branch `feature/rag-system-and-data-pipeline`. The service can now answer a
@@ -59,7 +164,8 @@ on. A library reply without sources, or a fixed reply with some, should never
 be rendered in the hope that it is right.
 
 - `answerType` must be one of `unavailable`, `grounded`, `reviewed_answer`,
-  `abstained`, `redirected` or `safety`.
+  `abstained`, `redirected` or `safety`. (Superseded 2026-09-25: `chat` is
+  also accepted, with no sources; see the entry above.)
 - The library types, `grounded` and `reviewed_answer`, carry 1–4 sources whose
   ids match the citations one for one, in order. Every other type carries none,
   so no other reply can borrow the library's authority.
@@ -92,6 +198,9 @@ be rendered in the hope that it is right.
   | `safety` | "You can talk to a grown-up you trust" | ink |
   | `unavailable` | "Service response" | teal |
 
+  (Superseded 2026-09-25: `chat` was added later and has no label; see the
+  entry above.)
+
   The wording stays calm for every type, because not being sure, or being
   pointed to a grown-up, is not a mistake the child made. The safety label uses
   the steady ink colour, not an alert colour, so it does not alarm.
@@ -100,8 +209,10 @@ be rendered in the hope that it is right.
   are plain text, not links, because there is nothing on the phone to open.
 - **A thinking bubble** replaces the reply while Robert is working. It says
   "Robert is looking in his library…", or "Robert is thinking…" when grounded
-  answers are off, next to a spinner, or a book icon under reduced motion. It
-  is a live region. The × stays usable, so a child does not have to wait out a
+  answers are off, next to a spinner, or a book icon under reduced motion.
+  (Superseded 2026-09-25: one line for every reply, "Robert is thinking… his
+  antennae are wiggling", with a robot icon under reduced motion; see the entry
+  above.) It is a live region. The × stays usable, so a child does not have to wait out a
   slow answer to take the question back.
 - **A long reply now scrolls from its beginning.** It used to open at its end.
   A reply can be 1,200 characters with four sources underneath, and a child
@@ -114,7 +225,9 @@ be rendered in the hope that it is right.
 - A new row reports the service's switch but offers no way to change it:
   - on: "Grounded answers: on · development corpus", with the subtitle "Answers
     come only from the service’s development library and show their sources.
-    The model runs on the service, never on this phone."
+    The model runs on the service, never on this phone." (Superseded
+    2026-09-25: the subtitle now also says that casual chat gets a friendly
+    reply without sources; see the entry above.)
   - off: "Grounded answers: off", with the subtitle "No AI model answers
     questions."
 - "Content awaits review" no longer says that no AI provider is enabled. The
@@ -161,7 +274,9 @@ be rendered in the hope that it is right.
   thinking bubble, a grounded reply with its "Sources" list, and a ruling
   redirect labelled "Let’s ask a grown-up" all rendered as designed. See
   `design/thinking-bubble.png`, `design/grounded-answer.png` and
-  `design/redirect-reply.png`. The first try surfaced a verifier issue on the
+  `design/redirect-reply.png`. (Superseded 2026-09-25:
+  `design/thinking-bubble.png` has been replaced and now shows the new thinking
+  line; see the entry above.) The first try surfaced a verifier issue on the
   server (Qwen sometimes cites once after two sentences), now fixed as
   `grounding-v2`; see `comp-server/CHANGELOG.md`.
 
@@ -171,7 +286,9 @@ for children.
 
 Known issues:
 - **Pre-existing:** at 320×380 with text at 2×, the composer's hint wraps and
-  leaves the reply about 64 px.
+  leaves the reply about 64 px. (Superseded 2026-09-25: measured again in the
+  widget tester with Roboto loaded, the old hint left about 56 px; the new,
+  shorter hint leaves about 107 px. See the entry above.)
 - **Source limits now match** (resolved before commit). The server's schema
   caps a source's title at 120 characters and its reference at 160, the same as
   this app, and its pipeline refuses any document that could exceed them, so a
