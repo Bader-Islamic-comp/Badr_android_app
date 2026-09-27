@@ -1,0 +1,77 @@
+{
+  "skins": [
+    {
+      "id": "cowboy",
+      "triangles": 16266,
+      "bones": 24,
+      "rig_rest_contract_matches": true,
+      "skin_weights_normalized": true,
+      "png_face_uv_preserved": true,
+      "face_visibility_pose_samples": 18,
+      "glb_reimport_passed": true,
+      "glb_sha256": "1d5daa9c40c4ab71f63fcf6a760be380af677c8f7b2a3ce212e1b2dd67272ddd",
+      "unity_device_tested": false
+    },
+    {
+      "id": "astronaut",
+      "triangles": 12826,
+      "bones": 24,
+      "rig_rest_contract_matches": true,
+      "skin_weights_normalized": true,
+      "png_face_uv_preserved": true,
+      "face_visibility_pose_samples": 18,
+      "glb_reimport_passed": true,
+      "glb_sha256": "183a55a95a45a340ad5ec8e1774ec81195b1ba5ad58c57e902b4adfbff89b7f9",
+      "unity_device_tested": false
+    },
+    {
+      "id": "arab_thobe",
+      "triangles": 13594,
+      "bones": 24,
+      "rig_rest_contract_matches": true,
+      "skin_weights_normalized": true,
+      "png_face_uv_preserved": true,
+      "face_visibility_pose_samples": 18,
+      "glb_reimport_passed": true,
+      "glb_sha256": "b25d1e212524669f9408c520f84621d038697aaede374628616efdc16d6d4bd2",
+      "unity_device_tested": false
+    },
+    {
+      "id": "casual",
+      "triangles": 18254,
+      "bones": 24,
+      "rig_rest_contract_matches": true,
+      "skin_weights_normalized": true,
+      "png_face_uv_preserved": true,
+      "face_visibility_pose_samples": 18,
+      "glb_reimport_passed": true,
+      "glb_sha256": "cb161eed547285d91f6c788b34160a7adc2c50e5e7e5093170466336e48fca33",
+      "unity_device_tested": false
+    },
+    {
+      "id": "explorer",
+      "triangles": 21926,
+      "bones": 24,
+      "rig_rest_contract_matches": true,
+      "skin_weights_normalized": true,
+      "png_face_uv_preserved": true,
+      "face_visibility_pose_samples": 18,
+      "glb_reimport_passed": true,
+      "glb_sha256": "a8c47edced85a44f77be97016b783780b67a0aa65bfda2f7f886645f735747c5",
+      "unity_device_tested": false
+    },
+    {
+      "id": "gardener",
+      "triangles": 24214,
+      "bones": 24,
+      "rig_rest_contract_matches": true,
+      "skin_weights_normalized": true,
+      "png_face_uv_preserved": true,
+      "face_visibility_pose_samples": 18,
+      "glb_reimport_passed": true,
+      "glb_sha256": "d369e24a4faf19d15054e5ef47c2d888bab3d2af596ecead783ed003df9fadcd",
+      "unity_device_tested": false
+    }
+  ],
+  "note": "Face visibility is ray-tested in 18 sampled poses per skin. Additional dense motion checks are in animations_validation.json. Arbitrary locomotion and device tests remain pending."
+}

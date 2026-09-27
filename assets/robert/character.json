@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "robert",
+  "display_name": "Robert",
+  "default_skin": "default",
+  "path_base": "character_root",
+  "skins": {
+    "default": "skins/default/skin.json",
+    "cowboy": "skins/cowboy/skin.json",
+    "astronaut": "skins/astronaut/skin.json",
+    "arab_thobe": "skins/arab_thobe/skin.json",
+    "casual": "skins/casual/skin.json",
+    "explorer": "skins/explorer/skin.json",
+    "gardener": "skins/gardener/skin.json"
+  },
+  "rig_contract": "shared/rig_contract.json",
+  "default_face_set": "shared/faces/default/animations.json"
+}

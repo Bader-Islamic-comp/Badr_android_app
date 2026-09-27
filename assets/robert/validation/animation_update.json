@@ -1,0 +1,39 @@
+{
+  "skins": [
+    {
+      "skin": "default",
+      "geometry_and_rest_unchanged": true,
+      "geometry_sha256": "d3a07156de34a46504f8195313f86ba4f5bcb1641b10aa653c94a05bc9943040"
+    },
+    {
+      "skin": "cowboy",
+      "geometry_and_rest_unchanged": true,
+      "geometry_sha256": "9a489d2b8adea9b2c158af1988603b058894a3abc324d26e80f3ad3d8efef457"
+    },
+    {
+      "skin": "astronaut",
+      "geometry_and_rest_unchanged": true,
+      "geometry_sha256": "349afdf0f75b220cfe8c0fea5e0ba810ff73065bdc0dce4f12e803e2de6858ce"
+    },
+    {
+      "skin": "arab_thobe",
+      "geometry_and_rest_unchanged": true,
+      "geometry_sha256": "6851a2feb34c7c2728f42932d552054b780974ae73477299a2b56db0ee52d487"
+    },
+    {
+      "skin": "casual",
+      "geometry_and_rest_unchanged": true,
+      "geometry_sha256": "ca8a9953a388a50e9d71b621b96a6667654fdd0edef9c55163fa409c712beb5a"
+    },
+    {
+      "skin": "explorer",
+      "geometry_and_rest_unchanged": true,
+      "geometry_sha256": "4facd8de440b5d9d26c3e1576050b6372871a8be42dcdd9e571146bf1855bba0"
+    },
+    {
+      "skin": "gardener",
+      "geometry_and_rest_unchanged": true,
+      "geometry_sha256": "9dbb24dfa97090b5763be2d1d5eda093deca29c4d5852fccf2033083d06d1588"
+    }
+  ]
+}

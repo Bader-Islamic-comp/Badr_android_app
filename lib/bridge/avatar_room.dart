@@ -127,7 +127,21 @@ class AvatarRoom extends ChangeNotifier {
     return _bridge.setMotionEnabled(value);
   }
 
+  /// True when the current room is initialized, visible, foregrounded and
+  /// allowed to move, so a cue sent now would play.
+  bool get animating => _bridge.animating;
+
+  /// True while the current room is looping Talk. A rebuilt room starts
+  /// resting, so this does not survive [retry].
+  bool get talking => _bridge.talking;
+
   bool react(AvatarReaction reaction) => _bridge.react(reaction);
+
+  bool express(AvatarEmotion emotion) => _bridge.express(emotion);
+
+  bool startTalking() => _bridge.startTalking();
+
+  bool stopTalking() => _bridge.stopTalking();
 
   Future<bool> openRoom() => _bridge.openRoom();
 

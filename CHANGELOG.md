@@ -6,6 +6,273 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-09-27 (animations)
+
+Commits `7705441` (the package), `8576283` (the Unity room) and `91ed49d` (the app) on
+branch `feature/rag-system-and-data-pipeline`. The product owner's request of
+2026-09-27, verbatim:
+
+> "I have added a bunch of new animations and updated some of the assets in
+> the android app, can you update the codebase and implement these changes?
+> use subagents."
+
+The owner's updated character package replaces the old one. From it Robert
+gets a resting loop that keeps moving, a Talk loop and eight new one-shot
+faces. The Unity room plays them, and the app decides when: Robert talks while
+a reply appears and then reacts to its answer type, and he reacts to taps, to
+looks and to finishing the orientation. Only allowlisted cue names cross the
+bridge; no question or reply text does. The bridge stays v1 with the same
+capabilities; only its animation and emotion allowlists grew. Three existing
+room bugs were fixed on the way, one of which froze Robert after startup. The
+paired server entry is in `comp-server/CHANGELOG.md` (the schema copy only).
+
+### Package (`assets/robert/`)
+
+- The owner supplied the updated package at `assets/robert/`: `README.md`,
+  `ANIMATIONS.md`, `SKINS.md`, `character.json`, the seven skins
+  (`skins/<folder>/` with `skin.json`, `model/Robert.glb` and
+  `source/Robert.blend`), the shared faces, `shared/animations.json`,
+  `shared/rig_contract.json`, `tools/`, the `unity/` helpers, `validation/` and
+  `previews/`. It supersedes `assets/characters/robert/`, which is removed.
+  `tools/render_skin_preview.py`, written for the outfits and not part of the
+  supplied package, is carried over unchanged.
+- Only `assets/robert/Robert.png`, the static-avatar preview already in that
+  folder, ships in the app; `pubspec.yaml` is unchanged and the package itself
+  is not bundled.
+- Every skin's GLB and Blender source carries six body clips, 30 fps with no
+  root motion (`ANIMATIONS.md`, `shared/animations.json`):
+
+  | Body clip | Length | Playback |
+  |---|---:|---|
+  | `Standing` | 6.0 s | Loop, new; the resting state |
+  | `Idle` | 6.0 s | Loop; the same motion, kept as an alias |
+  | `Wave` | 3.2 s | One-shot, re-timed |
+  | `Talk` | 4.8 s | Loop, new |
+  | `Nod` | 1.6 s | One-shot |
+  | `Celebrate` | 2.4 s | One-shot |
+
+- Faces (`shared/faces/default/`): the `idle` loop blinks now and then, and the
+  `talk` loop is now a 4.8 s mouth cycle (it was 0.7 s). Eight new one-shot
+  expressions, `joy`, `giggle`, `wink`, `curious`, `wow`, `sleepy`, `bashful`
+  and `starry`, use the new `cute_*.png` frames.
+- Current references to the old path are repointed: `.gitignore`,
+  `assets/README.md`, `unity/README.md`, `unity/validation/Test-EditMode.ps1`,
+  `lib/theme.dart` and the Android design spec's acceptance evidence. Older
+  changelog entries, and the spec's record of what was supplied on
+  2026-09-21, keep the path they had.
+- The Style tab's six outfit thumbnails in `assets/looks/` are regenerated from
+  the new `previews/<folder>.png`, still 256 px.
+
+### Unity room
+
+- All seven FBX files are re-exported with six clips each, and the faces are
+  staged again from the package into `Assets/Companion/Character/Robert/Faces/`,
+  with the nine new `cute_*.png` frames.
+- `CompanionRoomBuilder`:
+  - requires the six clips on every model, outfits included, and refuses to
+    build if the bridge's animation allowlist differs from them or the face
+    manifest lacks a clip a cue needs;
+  - sets Loop Time on for Standing, Idle and Talk and off for Wave, Nod and
+    Celebrate, and checks that it took;
+  - keeps keyframe reduction but holds the rotation error to 0.05° (the default
+    0.5° had flattened Standing's sway);
+  - makes Standing the Animator's default state, and returns each one-shot to
+    it with a 0.2 s fixed transition at its end;
+  - pins every face frame to Default, sRGB, bilinear and Clamp;
+  - writes each face clip's length from the manifest into the presentation's
+    `faceCues`.
+- **Three existing bugs fixed:**
+  - Every clip imported with Loop Time off, so the old `Idle` played once and
+    froze, after startup and after every one-shot.
+  - The Animator states were bound to Unity's editor-only `__preview__` copies
+    of the clips rather than the configured ones.
+  - Face PNGs imported with Repeat wrap, which can bleed the opposite border
+    into the face.
+- New `AvatarPerformance.cs` holds the body and face rules with no Unity
+  types, and `RobertAvatarPresentation.cs` is rewritten to carry them out on
+  whichever model is installed:
+  - `avatar.play` crossfades the body over 0.2 s and starts its paired face:
+    Standing and Idle → `idle`, Talk → `talk`, Wave and Celebrate → `joy`,
+    Nod → `idle`. Re-sending the loop that is already playing restarts nothing.
+  - `avatar.set_emotion` plays the face once (`neutral` shows the neutral
+    face), and blinking resumes once the body is resting.
+  - `app.pause` freezes body and face; `app.resume` crossfades to Standing and
+    restarts blinking. A skin swap re-applies the current state: resting, Talk,
+    or frozen if paused.
+- The allowlists in `BridgeCommand` and in
+  `contracts/avatar-bridge-v1.schema.json` (byte-identical with comp-server),
+  matched exactly and case-sensitively:
+  - animations: `Standing`, `Idle`, `Wave`, `Talk`, `Nod`, `Celebrate`
+  - emotions: `neutral`, `happy`, `surprised`, `joy`, `giggle`, `wink`,
+    `curious`, `wow`, `sleepy`, `bashful`, `starry`
+
+  The bridge stays v1 and the negotiated capabilities are unchanged.
+- `unity/README.md` documents the clips, the cue rules and the import fixes
+  (*Why FBX and not the GLB*, *Animation and face cues*).
+
+### App
+
+- `lib/ui/robert_cues.dart` (new) picks every cue from something the app
+  already knows. It sees a reply only as its answer type and its length in
+  runes, so no question or reply text reaches Unity.
+- **Talking.** A reply released on Talk starts the `Talk` loop for 55 ms per
+  character, kept between 1.5 s and 7 s, then `Standing`. This replaces the
+  `Nod` that used to follow every released reply. The talk stops at once on
+  clear, a new question, leaving Talk, turning motion off or backgrounding, and
+  the bridge sends `Standing` before `app.pause`, so a paused room never
+  resumes mid-talk.
+- **After talking**, by answer type: `grounded` and `reviewed_answer` get a
+  `Nod`, and `abstained` the `curious` face. `chat`, `safety`, `redirected` and
+  `unavailable` get no face. An occasional `joy` face after chat was planned
+  and removed: the service's reply to a sad feeling is also `chat`, and the app
+  must not read the text to tell them apart. A non-text tone signal from the
+  service would be needed first.
+- **Tapping Robert** cycles `Wave`, the `giggle` face and the `wink` face,
+  through the bounded queue (at most three, 1.2 s apart). Taps and faces are
+  declined while he talks. The tap hint now reads "Robert waves, giggles or
+  winks".
+- **Looks and the orientation.** Earning a look gives the `starry` face,
+  wearing one a `Celebrate`, and finishing the orientation a `Celebrate`, then
+  `starry` 1.2 s later.
+- **Bug fixed:** the room is paused on every page but Talk, so those
+  celebrations used to be declined silently. They are now held until Robert is
+  next shown on Talk (or, if he is talking, until the talk ends). Only the
+  latest is kept, and backgrounding forgets it.
+- **Reduced motion** sends nothing: no talk, no reaction and no face, because
+  every face is itself animated.
+- `AvatarBridge` gains `animations` and `emotions` allowlists equal to the
+  schema's, `startTalking`, `stopTalking` and `talking`, and `express`, which
+  queues a face in the same bounded queue as `react`. `setEmotion` is removed.
+  `AvatarRoom` forwards the new calls.
+- No trigger yet: `sleepy`, `wow`, `bashful`, and the older `happy` and
+  `surprised`.
+- `README.md` gains *Robert's talk and reactions*.
+
+### Verification
+
+- Flutter: 88 → **127 tests**, including a parity test that the app's
+  animation and emotion allowlists match the bridge schema.
+- Unity: bridge core checks 38 → **93** (the allowlists, exact case, schema
+  parity, face pairing and which clips loop). EditMode 12 → **41**: 22 new
+  tests of the presentation rules in `AvatarPerformance` and 7 of the
+  generated assets. The room builds (`ROOM_OK`) and the x86_64 Android export
+  succeeds (`EXPORT_OK`).
+- Server: the schema copy is identical in both repositories, and `pytest` is
+  539 passed.
+- On the Android 16 x86_64 emulator, against the development harness:
+  - Standing moves at rest: the mean pixel change between frames 0.8 s apart
+    was 1.9–4.7.
+  - The greeting Wave plays (`design/robert-greeting-wave.png`).
+  - Taps show the giggle and wink faces, the right way up
+    (`design/face-giggle.png`, `design/face-wink.png`).
+  - Talk shows the mouth cycle and arm gestures while a reply appears
+    (`design/robert-talking.png`, an `unavailable` reply).
+  - Earning Casual on Style, then returning to Talk, plays the starry face
+    after about 0.5 s (`design/face-starry.png`).
+- Docs: `README.md`, `unity/README.md`, `assets/README.md`, the design spec's
+  asset path and this entry.
+
+### Known gaps
+
+- Not seen on the emulator yet: the `curious` face after an abstention, the
+  `Nod` after a grounded answer (the harness had grounded answers off),
+  reduced motion, a skin swap during Talk, and pause and resume on a device.
+  `Celebrate` and the faces with no trigger were not looked at either; they
+  rest on the EditMode rules and asset checks.
+- The mouth cycle is decorative, not lip-sync, and talk time is estimated from
+  the reply's length.
+- No physical device, ARM64 export, frame-time or memory measurement. Each
+  re-exported FBX is about 0.3 MB larger, and the effect on the room's load
+  time is unmeasured.
+
+## Unreleased — 2026-09-25 (outfits)
+
+Commit `b12fa70` ("Add six modelled outfits Robert can earn and wear") on
+branch `feature/rag-system-and-data-pipeline`. Six modelled outfits for Robert, from the skins added to the character
+package: **Casual, Cowboy, Astronaut, Arab Thobe, Explorer and Gardener**. They
+join the three colourways in one catalogue, are earned with learning stars like
+any look, and are worn in the Unity room by swapping in the outfit's own model.
+The paired server entry is in `comp-server/CHANGELOG.md`.
+
+### Character package (`assets/characters/robert/`)
+
+- The six skins (`skins/<folder>/` with `skin.json`, `model/Robert.glb` and
+  `source/Robert.blend`) are committed as supplied and registered in
+  `character.json`. Each has a reshaped `Robert_Body`, a separate
+  `Robert_Outfit` garment mesh and the shared `FaceScreen`; all six carry the
+  default 24-bone rig exactly and the same Idle, Wave, Nod and Celebrate clips
+  (checked in background Blender before anything was built).
+- `previews/<folder>.png`, which each `skin.json` already referenced, are now
+  rendered: `tools/render_skin_preview.py` renders a skin from its own scene
+  camera and lights with the same Cycles settings as `build_robert.py`, and
+  writes a 256 px thumbnail for the app.
+
+(Superseded 2026-09-27: the package now lives at `assets/robert/`, every skin
+carries six clips, and the thumbnails are regenerated from the package's new
+previews; see the entry above.)
+
+### Unity room
+
+- `tools/export_robert_fbx.py` keeps `Robert_Outfit`; each outfit is exported
+  to `Assets/Companion/Character/Skins/<id>/Robert.fbx`. The cosmetic id is the
+  folder name with `_` written `-` (`arab_thobe` → `arab-thobe`), because
+  cosmetic ids are letters, digits and hyphens everywhere they travel (the
+  app's identifier check refuses `_`).
+- `CompanionRoomBuilder` builds a prefab and skin definition per outfit
+  (`Generated/RobertSkin_<id>.*`) with the shared face material and Animator,
+  refuses an outfit whose rig differs from the default's transform for
+  transform, frames the camera around every look so a hat is never cropped,
+  and wires the outfits into the presentation.
+- `RobertAvatarPresentation`: an outfit id swaps in that skin through
+  `RobertSkinController`, and success is judged by what is actually worn
+  afterwards, since the controller falls back to the default skin. A
+  colourway puts the original model back first, then tints it. Outfits are
+  never tinted. A swapped-in model starts neutral and idle and stays frozen
+  while paused. Initialization re-resolves the Animator after re-applying the
+  look, because an outfit replaces it.
+- `BridgeCommand.Cosmetics` and the shared `contracts/avatar-bridge-v1.schema.json`
+  (byte-identical in both repositories) list all ten looks.
+
+### App
+
+- `AvatarBridge.cosmetics` lists all ten looks. A new test reads the bridge
+  schema and fails if the allowlist and the schema ever differ.
+- **Style** shows outfits with their rendered thumbnail (`assets/looks/`,
+  declared in `pubspec.yaml`) where colourways show a colour dot; the slot is
+  56 px for both. The explanation card now reads "What a look changes: Colour
+  looks recolour Robert in the character room. Outfits give him new clothes,
+  like a hat, a vest or boots. Either way his face stays as it is, and every
+  look is earned the same way: with learning stars."
+
+### Verification
+
+- Docs: `README.md`, `unity/README.md` (new *Outfits* section),
+  `assets/characters/robert/README.md`, the Android design spec and the shared
+  roadmap (§9 status note, byte-identical with comp-server) describe the ten looks.
+- Flutter: 86 → **88 tests**, analysis clean. Bridge core checks: 36 → **38**
+  (an outfit is a catalogue look; the folder name `arab_thobe` is not). Unity
+  EditMode: **12/12**. The room builds in batch mode with all six outfits and
+  the x86_64 Android export succeeds.
+- On the Android 16 emulator, against a development harness seeded with 200
+  learning stars (only the orientation lesson grants stars in the demo): the
+  Style tab lists all ten looks with thumbnails; Arab Thobe, then Cowboy, were
+  earned and worn and the room swapped models each time; wearing Sunset Copper
+  afterwards restored the original model in copper. See
+  `design/style-outfits.png`, `design/outfit-thobe.png` and
+  `design/outfit-cowboy.png`.
+
+### Known gaps
+
+- Only three of the six outfits (thobe, cowboy, and astronaut's thumbnail)
+  were looked at on the emulator; the other outfits are verified by the
+  build's rig check and the previews, not by eye in the room.
+- The cowboy hat is small and sits on the head's top edge, as authored; the
+  art is reproduced faithfully rather than adjusted.
+- No physical device, ARM64 export, frame-time or memory measurement: six
+  more models add to the room's download and load time, unmeasured.
+- The demo still grants only 5 stars, so outfits cannot be earned in the
+  normal demo flow without more lessons.
+
 ## Unreleased — 2026-09-25 (casual chat)
 
 Commit `c6419b6` ("Show Robert's casual chat replies") on branch

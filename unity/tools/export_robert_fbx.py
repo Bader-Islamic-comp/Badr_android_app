@@ -1,7 +1,9 @@
 import bpy, sys, os
 
 out = sys.argv[sys.argv.index('--') + 1]
-keep = {'FaceScreen', 'Robert_Body', 'Robert_Rig'}
+# Robert_Outfit exists only in outfit skins: a separate garment mesh skinned to
+# the same rig. The default skin has none, and nothing else is exported.
+keep = {'FaceScreen', 'Robert_Body', 'Robert_Rig', 'Robert_Outfit'}
 
 # The canonical scene carries a camera, lights and a studio floor for renders.
 # The room builder creates its own, so export the character only.

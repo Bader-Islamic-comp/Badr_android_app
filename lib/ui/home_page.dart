@@ -6,10 +6,12 @@ import '../bridge/avatar_bridge.dart';
 import '../bridge/avatar_room.dart';
 import '../data/demo_api.dart';
 import '../domain/companion_controller.dart';
+import '../domain/models.dart';
 import '../theme.dart';
 import 'learn_page.dart';
 import 'parent_sheet.dart';
 import 'quests_page.dart';
+import 'robert_cues.dart';
 import 'style_page.dart';
 import 'talk_page.dart';
 import 'widgets.dart';
@@ -20,9 +22,13 @@ enum CompanionDestination { talk, learn, quests, style }
 /// the character room and reply surface, a bottom composer and compact
 /// navigation. Flutter owns every interactive control.
 class CompanionHome extends StatefulWidget {
-  const CompanionHome({super.key, this.controller, this.room});
+  const CompanionHome({super.key, this.controller, this.room, this.startTimer});
   final CompanionController? controller;
   final AvatarRoom? room;
+
+  /// Times how long Robert talks. Tests pass their own so they can end a talk
+  /// without waiting on the clock.
+  final StartTimer? startTimer;
 
   @override
   State<CompanionHome> createState() => _CompanionHomeState();
@@ -32,6 +38,11 @@ class _CompanionHomeState extends State<CompanionHome>
     with WidgetsBindingObserver {
   late final CompanionController model;
   late final AvatarRoom room;
+  late final RobertCues cues;
+
+  /// The reply Robert is talking about, by identity: when the controller no
+  /// longer shows it, the talk stops.
+  Reply? speaking;
   final question = TextEditingController();
   CompanionDestination destination = CompanionDestination.talk;
   int? lessonStep;
@@ -54,13 +65,23 @@ class _CompanionHomeState extends State<CompanionHome>
     model = widget.controller ??
         CompanionController(DemoApi(DemoConfig.environment()));
     room = widget.room ?? AvatarRoom();
+    cues = RobertCues(room, startTimer: widget.startTimer);
     // The room follows the service's record of what is worn, not the tap that
     // changed it: that is also what restores the look after a relaunch or a
     // room rebuild, neither of which involves a tap.
     model.addListener(_syncCosmetic);
     room.addListener(_syncCosmetic);
+    model.addListener(_syncTalk);
     WidgetsBinding.instance.addObserver(this);
     _startRoom();
+  }
+
+  /// Robert stops talking the moment the reply he is talking about goes:
+  /// cleared, or replaced when a new question starts.
+  void _syncTalk() {
+    if (speaking == null || identical(model.reply, speaking)) return;
+    speaking = null;
+    cues.quiet();
   }
 
   void _syncCosmetic() {
@@ -89,12 +110,15 @@ class _CompanionHomeState extends State<CompanionHome>
     final reduced = MediaQuery.disableAnimationsOf(context);
     if (reduced == platformReducedMotion) return;
     platformReducedMotion = reduced;
+    if (!motionEnabled) cues.quiet();
     room.setMotionEnabled(motionEnabled);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    room.setForeground(state == AppLifecycleState.resumed);
+    final foreground = state == AppLifecycleState.resumed;
+    if (!foreground) cues.backgrounded();
+    room.setForeground(foreground);
   }
 
   @override
@@ -102,24 +126,31 @@ class _CompanionHomeState extends State<CompanionHome>
     WidgetsBinding.instance.removeObserver(this);
     model.removeListener(_syncCosmetic);
     room.removeListener(_syncCosmetic);
+    model.removeListener(_syncTalk);
+    cues.dispose();
     question.dispose();
     if (widget.controller == null) model.dispose();
     if (widget.room == null) room.dispose();
     super.dispose();
   }
 
-  void _select(CompanionDestination value) {
+  Future<void> _select(CompanionDestination value) async {
     setState(() => destination = value);
-    room.setOnCharacterPage(value == CompanionDestination.talk);
+    final talk = value == CompanionDestination.talk;
+    // Ended while the room is still resumed, so the room accepts it; the
+    // bridge would also end a talk on the pause that follows.
+    if (!talk) cues.quiet();
+    await room.setOnCharacterPage(talk);
+    if (talk && mounted && destination == CompanionDestination.talk) {
+      cues.characterShown();
+    }
   }
 
   void _setMotion(bool enabled) {
     setState(() => motionOverride = enabled);
+    if (!enabled) cues.quiet();
     room.setMotionEnabled(enabled);
   }
-
-  /// Local deterministic presentation cue. Never a model-generated command.
-  void _cue(AvatarReaction reaction) => room.react(reaction);
 
   Future<void> _finishOrientation() async {
     final celebrated = await model.completeOrientation();
@@ -129,14 +160,23 @@ class _CompanionHomeState extends State<CompanionHome>
       destination = CompanionDestination.quests;
     });
     await room.setOnCharacterPage(false);
-    if (celebrated) _cue(AvatarReaction.celebrate);
+    // Robert is off screen on Quests, so the celebration waits for him.
+    if (celebrated) cues.orientationCompleted();
   }
 
   Future<void> _ask() async {
+    // A new question: whatever Robert was saying about the last reply stops.
+    speaking = null;
+    cues.quiet();
     final released = await model.ask(question.text);
     if (!mounted) return;
     if (!model.canRetryQuestion) question.clear();
-    if (released) _cue(AvatarReaction.nod);
+    final reply = model.reply;
+    if (released && reply != null && onCharacterPage) {
+      speaking = reply;
+      // The answer type and the length are all that leave the reply here.
+      cues.replyShown(reply.type, reply.text.runes.length);
+    }
   }
 
   @override
@@ -277,7 +317,9 @@ class _CompanionHomeState extends State<CompanionHome>
             model: model,
             room: room,
             overRoom: room.surfaceAttached,
-            onTapCharacter: () => _cue(AvatarReaction.wave),
+            onTapCharacter: () {
+              cues.tapped();
+            },
           ),
         CompanionDestination.learn => LearnPage(
             model: model,
@@ -288,7 +330,8 @@ class _CompanionHomeState extends State<CompanionHome>
         CompanionDestination.quests => QuestsPage(model: model),
         CompanionDestination.style => StylePage(
             model: model,
-            onEquipped: () => _cue(AvatarReaction.celebrate),
+            onEarned: cues.lookEarned,
+            onEquipped: cues.lookWorn,
           ),
       };
 

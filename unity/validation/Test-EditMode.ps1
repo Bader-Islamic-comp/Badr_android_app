@@ -7,9 +7,12 @@ Builds a throwaway Unity project outside the repository, copies in
 Assets/Companion together with the three canonical character helpers, and runs
 the Companion.Presentation.Tests suite in batch mode.
 
-This proves script compilation and receiver behaviour only. It imports no glTF
-model, builds no scene and exports no Android project, so rendering, the
+This proves script compilation, receiver behaviour and the presentation's
+body/face rules, and checks the room's generated assets (Animator, clip import
+settings, face players, face textures) as the throwaway project imports them.
+It builds no scene and exports no Android project, so rendering, the
 Unity-as-a-Library export and every device measurement remain unverified.
+Rebuild the room first: the asset checks read what was last generated.
 
 .EXAMPLE
 powershell -NoProfile -ExecutionPolicy Bypass -File validation/Test-EditMode.ps1
@@ -22,7 +25,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $kit = Resolve-Path (Join-Path $PSScriptRoot '..')
-$character = Join-Path $kit '../assets/characters/robert/unity'
+$character = Join-Path $kit '../assets/robert/unity'
 
 if (-not $UnityPath) {
     $editors = Join-Path ${env:ProgramFiles} 'Unity\Hub\Editor'

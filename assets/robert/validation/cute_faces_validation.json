@@ -1,0 +1,22 @@
+{
+  "clips": [
+    "joy",
+    "giggle",
+    "wink",
+    "curious",
+    "wow",
+    "sleepy",
+    "bashful",
+    "starry"
+  ],
+  "image_size": [
+    1024,
+    512
+  ],
+  "rendered_on_model": [
+    "joy",
+    "wink"
+  ],
+  "default_model_modified": false,
+  "unity_runtime_tested": false
+}

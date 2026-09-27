@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "rig_contract": "robert-rig-v1",
+  "fps": 30,
+  "root_motion": false,
+  "default_body_clip": "Standing",
+  "face_set": "shared/faces/default/animations.json",
+  "transition_seconds": 0.2,
+  "one_shot_return": "Standing",
+  "clips": {
+    "Standing": {
+      "duration_seconds": 6.0,
+      "loop": true,
+      "face_clip": "idle"
+    },
+    "Idle": {
+      "duration_seconds": 6.0,
+      "loop": true,
+      "face_clip": "idle",
+      "alias_of": "Standing"
+    },
+    "Wave": {
+      "duration_seconds": 3.2,
+      "loop": false,
+      "face_clip": "joy"
+    },
+    "Talk": {
+      "duration_seconds": 4.8,
+      "loop": true,
+      "face_clip": "talk"
+    },
+    "Nod": {
+      "duration_seconds": 1.6,
+      "loop": false,
+      "face_clip": "idle"
+    },
+    "Celebrate": {
+      "duration_seconds": 2.4,
+      "loop": false,
+      "face_clip": "joy"
+    }
+  },
+  "note": "Reference metadata; configure engine playback separately. Talk is decorative, not audio lip-sync."
+}

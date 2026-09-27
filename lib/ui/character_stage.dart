@@ -123,7 +123,7 @@ class CharacterStage extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Say hello to Robert',
-      hint: 'Robert gives a short wave or nod',
+      hint: 'Robert waves, giggles or winks',
       child: GestureDetector(
         onTap: onTapCharacter,
         behavior: HitTestBehavior.opaque,

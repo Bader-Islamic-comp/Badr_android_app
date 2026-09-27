@@ -20,7 +20,7 @@ ios/Flutter/flutter_export_environment.sh
 
 # Large binaries kept on disk for reference but not tracked. `archive/` holds
 # superseded character revisions and the packaged distributable, both of which
-# are reproducible from assets/characters/robert/tools/. `design/ui.make` is the
+# are reproducible from assets/robert/tools/. `design/ui.make` is the
 # 6 MB Figma source; design/ui-reference.png is the tracked layout reference.
 archive/
 design/ui.make

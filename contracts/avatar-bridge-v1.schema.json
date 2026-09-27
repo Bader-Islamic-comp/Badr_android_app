@@ -105,8 +105,10 @@
               "animation": {
                 "type": "string",
                 "enum": [
+                  "Standing",
                   "Idle",
                   "Wave",
+                  "Talk",
                   "Nod",
                   "Celebrate"
                 ]
@@ -138,7 +140,15 @@
                 "enum": [
                   "neutral",
                   "happy",
-                  "surprised"
+                  "surprised",
+                  "joy",
+                  "giggle",
+                  "wink",
+                  "curious",
+                  "wow",
+                  "sleepy",
+                  "bashful",
+                  "starry"
                 ]
               }
             }
@@ -168,7 +178,13 @@
                   "default",
                   "sunset",
                   "dune",
-                  "midnight"
+                  "midnight",
+                  "casual",
+                  "cowboy",
+                  "astronaut",
+                  "arab-thobe",
+                  "explorer",
+                  "gardener"
                 ]
               }
             }

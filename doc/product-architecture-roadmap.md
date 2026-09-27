@@ -378,6 +378,8 @@ These references inform product design but do not replace market-specific legal 
 
 ## 9. Challenges, rewards, and cosmetics
 
+> **Status (2026-09-25, development only):** the catalogue holds ten looks earned with learning stars from the server's append-only ledger: the original model, three colourways and six modelled outfits (Casual, Gardener, Arab Thobe, Explorer, Cowboy and Astronaut). An outfit is a whole skin on the shared rig that the Unity room swaps in; see `comp-mobile/unity/README.md` (*Outfits*). Prices are a development choice awaiting product review.
+
 ### 9.1 Verification
 
 Use:
