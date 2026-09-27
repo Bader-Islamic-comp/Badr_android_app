@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $runtime = Join-Path $PSScriptRoot '../Assets/Companion/Runtime'
-Add-Type -Path (Join-Path $runtime 'BridgeCommand.cs'), (Join-Path $runtime 'BridgeSession.cs'), (Join-Path $PSScriptRoot 'BridgeCoreProbe.cs')
+Add-Type -Path (Join-Path $runtime 'BridgeCommand.cs'), (Join-Path $runtime 'BridgeSession.cs'), (Join-Path $runtime 'AvatarPerformance.cs'), (Join-Path $PSScriptRoot 'BridgeCoreProbe.cs')
 function Envelope([string]$type, [hashtable]$payload, [long]$sequence, [string]$id = [guid]::NewGuid().ToString('D')) {
     @{schemaVersion=1; messageId=$id; type=$type; sequence=$sequence; payload=$payload} | ConvertTo-Json -Depth 5 -Compress
 }
@@ -69,5 +69,50 @@ Check ($narrow.Receive((Envelope 'avatar.initialize' @{characterId='robert'; cap
 Check (!$narrow.Receive((Envelope 'avatar.play' @{animation='Dance'} 2)).Accepted) 'Reject an unlisted animation'
 Check (!$narrow.Receive((Envelope 'avatar.initialize' @{characterId='someone-else'; capabilities=@()} 2)).Accepted) 'Reject a foreign character'
 Check ($narrow.Receive((Envelope 'app.pause' @{} 2)).Accepted) 'Rejections left the sequence available'
+# The animation and emotion allowlists, matched exactly. Body clips are
+# capitalised and face clips lowercase: `Talk` is a body cue, `talk` is not,
+# and no face clip that is not an emotion (idle, talk, blink) is an emotion.
+$animations = @('Standing', 'Idle', 'Wave', 'Talk', 'Nod', 'Celebrate')
+$emotions = @('neutral', 'happy', 'surprised', 'joy', 'giggle', 'wink', 'curious', 'wow', 'sleepy', 'bashful', 'starry')
+Check (([Companion.Presentation.BridgeCommand]::Animations -join ',') -eq ($animations -join ',')) 'Animation allowlist is exactly the six body clips'
+Check (([Companion.Presentation.BridgeCommand]::Emotions -join ',') -eq ($emotions -join ',')) 'Emotion allowlist is exactly the eleven expressions'
+$cues = New-Object CoreTestAvatar
+$cueSession = New-Object Companion.Presentation.BridgeSession($cues)
+Check ($cueSession.Receive((Envelope 'avatar.initialize' @{characterId='robert'; capabilities=@('avatar.play','avatar.set_emotion')} 0)).Accepted) 'Accept initialization for cues'
+$next = 1
+foreach ($animation in $animations) {
+    Check ($cueSession.Receive((Envelope 'avatar.play' @{animation=$animation} $next)).Accepted) "Accept animation $animation"
+    $next++
+}
+foreach ($emotion in $emotions) {
+    Check ($cueSession.Receive((Envelope 'avatar.set_emotion' @{emotion=$emotion} $next)).Accepted) "Accept emotion $emotion"
+    $next++
+}
+$before = $cues.Calls
+foreach ($animation in @('talk', 'standing', 'STANDING', 'idle', 'wave', 'nod', 'celebrate', 'joy', 'Dance', 'Walk', 'Sleepy', '')) {
+    $result = $cueSession.Receive((Envelope 'avatar.play' @{animation=$animation} $next))
+    Check (!$result.Accepted -and $result.Reason -eq 'invalid_envelope') "Reject animation '$animation'"
+}
+foreach ($emotion in @('Joy', 'JOY', 'Happy', 'Neutral', 'Starry', 'Talk', 'talk', 'idle', 'blink', 'angry', 'sad', '')) {
+    $result = $cueSession.Receive((Envelope 'avatar.set_emotion' @{emotion=$emotion} $next))
+    Check (!$result.Accepted -and $result.Reason -eq 'invalid_envelope') "Reject emotion '$emotion'"
+}
+Check ($cues.Calls -eq $before) 'Rejected cues never reach the presentation'
+Check ($cueSession.Receive((Envelope 'avatar.play' @{animation='Talk'} $next)).Accepted -and $cues.Calls -eq ($before + 1)) 'Rejected cues left the sequence available'
+# The shared schema carries the same allowlists as the receiver.
+$schemaPath = Join-Path $PSScriptRoot '../../contracts/avatar-bridge-v1.schema.json'
+$schema = Get-Content $schemaPath -Raw | ConvertFrom-Json
+function SchemaEnum([string]$type, [string]$field) {
+    $rule = $schema.allOf | Where-Object { $_.if.properties.type.const -eq $type }
+    ($rule.then.properties.payload.properties.$field.enum) -join ','
+}
+Check ((SchemaEnum 'avatar.play' 'animation') -eq ($animations -join ',')) 'Schema animation enum matches the receiver'
+Check ((SchemaEnum 'avatar.set_emotion' 'emotion') -eq ($emotions -join ',')) 'Schema emotion enum matches the receiver'
+# Every body cue brings its face, as the package pairs them.
+$pairs = [ordered]@{Standing='idle'; Idle='idle'; Talk='talk'; Wave='joy'; Nod='idle'; Celebrate='joy'}
+foreach ($animation in $pairs.Keys) {
+    Check ([Companion.Presentation.AvatarPerformance]::PairedFace($animation) -eq $pairs[$animation]) "$animation pairs with face $($pairs[$animation])"
+}
+Check (([Companion.Presentation.BridgeCommand]::Animations | Where-Object { [Companion.Presentation.AvatarPerformance]::IsLoop($_) }) -join ',' -eq 'Standing,Idle,Talk') 'Standing, Idle and Talk are the loops'
 
 Write-Output 'Bridge core checks passed. This is the engine-free core only; run Test-EditMode.ps1 for the receiver, and neither covers rendering, the Android export or a device.'

@@ -22,8 +22,26 @@ namespace Companion.Presentation
         public const long MaxSequence = 9007199254740991L; // JSON-safe integer.
         public const int MaxLength = 4096;
 
-        private static readonly string[] Animations = { "Idle", "Wave", "Nod", "Celebrate" };
-        private static readonly string[] Emotions = { "neutral", "happy", "surprised" };
+        /// <summary>
+        /// Body clips `avatar.play` may name, matched exactly: `Talk` is the
+        /// skeletal clip, and lowercase `talk` is a face clip that is never a
+        /// body cue. Standing is the resting loop; Idle is its alias; Talk
+        /// loops until the next cue; Wave, Nod and Celebrate are one-shots
+        /// that return to Standing on their own.
+        /// </summary>
+        public static readonly string[] Animations = {
+            "Standing", "Idle", "Wave", "Talk", "Nod", "Celebrate"
+        };
+
+        /// <summary>
+        /// Face expressions `avatar.set_emotion` may name, matched exactly.
+        /// Each one except `neutral` is a one-shot face clip of the same name.
+        /// </summary>
+        public static readonly string[] Emotions = {
+            "neutral", "happy", "surprised",
+            "joy", "giggle", "wink", "curious", "wow", "sleepy", "bashful", "starry"
+        };
+
         private const string Character = "robert";
 
         /// <summary>

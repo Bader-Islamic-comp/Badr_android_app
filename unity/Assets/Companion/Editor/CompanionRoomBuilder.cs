@@ -33,7 +33,38 @@ namespace Companion.Presentation.Editor
         private const string BackdropMaterial = Generated + "/RoomBackdrop_Unlit.mat";
         private const string FaceMesh = "FaceScreen";
         private const string Rig = "Robert_Rig";
-        private static readonly string[] BodyClips = { "Idle", "Wave", "Nod", "Celebrate" };
+
+        /// <summary>
+        /// The six body clips every model must carry, outfits included, by the
+        /// Blender action name. They are the bridge's `avatar.play` allowlist
+        /// exactly, which the build checks, so a cue can never name a state the
+        /// Animator lacks.
+        /// </summary>
+        private static readonly string[] BodyClips =
+        {
+            AvatarPerformance.Standing, AvatarPerformance.Idle, AvatarPerformance.Wave,
+            AvatarPerformance.Talk, AvatarPerformance.Nod, AvatarPerformance.Celebrate
+        };
+
+        /// <summary>
+        /// Clips imported with Loop Time. Standing is the resting loop and Idle
+        /// its alias; Talk loops until the next cue. Wave, Nod and Celebrate
+        /// play once and return to Standing through the Animator.
+        /// </summary>
+        private static readonly string[] LoopingClips =
+        {
+            AvatarPerformance.Standing, AvatarPerformance.Idle, AvatarPerformance.Talk
+        };
+
+        /// <summary>
+        /// The importer also makes an Inspector preview copy of every take,
+        /// named with this prefix. It is not the configured clip, so the
+        /// Animator must never bind it; an earlier build did, by accident.
+        /// </summary>
+        private const string PreviewPrefix = "__preview__";
+
+        /// <summary>Keyframe reduction's rotation tolerance, in degrees. Unity's default is 0.5.</summary>
+        private const float RotationErrorDegrees = 0.05f;
 
         /// <summary>
         /// Modelled outfits, by the cosmetic id the bridge and the service use.
@@ -148,12 +179,40 @@ namespace Companion.Presentation.Editor
 
         private static string Build()
         {
-            GameObject model = LoadModel(Model);
+            if (!new HashSet<string>(BridgeCommand.Animations, StringComparer.Ordinal).SetEquals(BodyClips))
+            {
+                throw new InvalidOperationException(
+                    "The bridge's animation allowlist (" + string.Join(", ", BridgeCommand.Animations) +
+                    ") and the body clips (" + string.Join(", ", BodyClips) + ") disagree.");
+            }
+            List<FaceClip> faceClips = ReadFaceClips();
+            CheckFaceCues(faceClips);
+            ConfigureFaceTextures(faceClips);
 
-            Dictionary<string, AnimationClip> clips = LoadBodyClips();
+            string[] rig = RigNames(LoadModel(Model));
+            LoadBodyClips(Model);
+
+            // Outfits share the face material, the Animator and the default
+            // model's clips, but each must still carry the default rig and all
+            // six clips with the same loop settings. Check every one before
+            // anything is generated, rather than assume the exports agree.
+            foreach (string id in Outfits)
+            {
+                string[] outfitRig = RigNames(LoadModel(OutfitModel(id)));
+                LoadBodyClips(OutfitModel(id));
+                if (!outfitRig.SequenceEqual(rig))
+                {
+                    throw new InvalidOperationException(
+                        "Outfit '" + id + "' does not carry the default rig (" + outfitRig.Length + " vs " +
+                        rig.Length + " transforms under " + Rig + "); its clips would not drive it.");
+                }
+            }
+
+            // Reloaded now that every importer has been configured, so nothing
+            // below holds a reference from before a reimport.
+            GameObject model = ReloadModel(Model);
+            Dictionary<string, AnimationClip> clips = LoadBodyClips(Model);
             Texture2D neutral = LoadFace("neutral");
-            Texture2D happy = LoadFace("happy");
-            Texture2D surprised = LoadFace("surprised");
 
             Directory.CreateDirectory(Generated);
             AssetDatabase.Refresh();
@@ -163,34 +222,26 @@ namespace Companion.Presentation.Editor
             AnimatorController controller = CreateAnimator(clips);
             Bounds framing;
             GameObject prefab = CreatePrefab(
-                model, faceMaterial, controller, neutral, Generated + "/RobertSkin_default.prefab", out framing);
+                model, faceMaterial, controller, neutral, faceClips,
+                Generated + "/RobertSkin_default.prefab", out framing);
             RobertSkinDefinition skin = CreateSkinDefinition(prefab, neutral, "default", SkinAsset);
-            string[] rig = RigNames(model);
 
-            // Outfits share the face material, the Animator and the default
-            // model's clips. The camera frames all of them, so a hat is never
-            // cropped by whichever look happens to be worn.
+            // The camera frames every look, so a hat is never cropped by
+            // whichever one happens to be worn.
             var outfits = new List<string>();
             foreach (string id in Outfits)
             {
-                GameObject outfitModel = LoadModel(OutfitModel(id));
-                string[] outfitRig = RigNames(outfitModel);
-                if (!outfitRig.SequenceEqual(rig))
-                {
-                    throw new InvalidOperationException(
-                        "Outfit '" + id + "' does not carry the default rig (" + outfitRig.Length + " vs " +
-                        rig.Length + " transforms under " + Rig + "); its clips would not drive it.");
-                }
+                GameObject outfitModel = ReloadModel(OutfitModel(id));
                 Bounds bounds;
                 string asset = Generated + "/RobertSkin_" + id + ".asset";
                 GameObject outfitPrefab = CreatePrefab(
-                    outfitModel, faceMaterial, controller, neutral,
+                    outfitModel, faceMaterial, controller, neutral, faceClips,
                     Generated + "/RobertSkin_" + id + ".prefab", out bounds);
                 framing.Encapsulate(bounds);
                 CreateSkinDefinition(outfitPrefab, neutral, id, asset);
                 outfits.Add(asset);
             }
-            string scenePath = CreateScene(skin, outfits, neutral, happy, surprised, framing);
+            string scenePath = CreateScene(skin, outfits, neutral, faceClips, framing);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -224,6 +275,12 @@ namespace Companion.Presentation.Editor
         private static GameObject LoadModel(string path)
         {
             ConfigureModelImporter(path);
+            return ReloadModel(path);
+        }
+
+        /// <summary>The imported model as it stands, without touching its importer.</summary>
+        private static GameObject ReloadModel(string path)
+        {
             GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (model == null)
             {
@@ -264,6 +321,33 @@ namespace Companion.Presentation.Editor
             // A material is needed in slot 0 so the face renderer can be found;
             // the generated unlit material replaces it immediately after.
             importer.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
+
+            // The resting sway is authored in fractions of a degree (the spine
+            // moves about 0.2-0.4 degrees). The default 0.5 degree keyframe
+            // reduction flattened it to a constant, so keep the reduction but
+            // hold rotations to a twentieth of a degree.
+            importer.animationCompression = ModelImporterAnimationCompression.KeyframeReduction;
+            importer.animationRotationError = RotationErrorDegrees;
+
+            // Loop Time per clip. Left to the importer's defaults every take
+            // imports with Loop Time off, which is how the Idle this room used
+            // to rest in came to play once and then hold its last frame.
+            ModelImporterClipAnimation[] takes = importer.defaultClipAnimations;
+            if (takes.Length == 0)
+            {
+                // The takes are only known once the file has been imported
+                // with animation, which a freshly copied model may not have been.
+                importer.SaveAndReimport();
+                takes = importer.defaultClipAnimations;
+            }
+            foreach (ModelImporterClipAnimation take in takes)
+            {
+                take.loopTime = LoopingClips.Contains(ClipName(take.takeName));
+                // The loops are authored seamless; Loop Pose would bend them.
+                take.loopPose = false;
+                take.cycleOffset = 0f;
+            }
+            importer.clipAnimations = takes;
             importer.SaveAndReimport();
         }
 
@@ -277,13 +361,18 @@ namespace Companion.Presentation.Editor
             return separator >= 0 ? name.Substring(separator + 1) : name;
         }
 
-        private static Dictionary<string, AnimationClip> LoadBodyClips()
+        /// <summary>
+        /// The six body clips of one model, by action name, matched exactly:
+        /// `Talk` is a body clip and `talk` a face clip. Refuses a model that
+        /// lacks one, or whose loop settings did not take.
+        /// </summary>
+        private static Dictionary<string, AnimationClip> LoadBodyClips(string path)
         {
-            var found = new Dictionary<string, AnimationClip>(StringComparer.OrdinalIgnoreCase);
-            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(Model))
+            var found = new Dictionary<string, AnimationClip>(StringComparer.Ordinal);
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(path))
             {
                 AnimationClip clip = asset as AnimationClip;
-                if (clip == null) continue;
+                if (clip == null || clip.name.StartsWith(PreviewPrefix, StringComparison.Ordinal)) continue;
                 string name = ClipName(clip.name);
                 if (!found.ContainsKey(name)) found[name] = clip;
             }
@@ -291,8 +380,19 @@ namespace Companion.Presentation.Editor
             if (missing.Length > 0)
             {
                 throw new InvalidOperationException(
-                    "The imported model is missing required clips: " + string.Join(", ", missing) +
-                    ". Found: " + string.Join(", ", found.Keys.ToArray()));
+                    path + " is missing required clips: " + string.Join(", ", missing) +
+                    ". Found: " + string.Join(", ", found.Keys.ToArray()) +
+                    ". Re-export it with tools/export_robert_fbx.py from the canonical Blender source.");
+            }
+            foreach (string name in BodyClips)
+            {
+                bool loops = AnimationUtility.GetAnimationClipSettings(found[name]).loopTime;
+                if (loops != LoopingClips.Contains(name))
+                {
+                    throw new InvalidOperationException(
+                        path + ": clip " + name + " imported with Loop Time " + (loops ? "on" : "off") +
+                        ", expected " + (loops ? "off" : "on") + ".");
+                }
             }
             return found;
         }
@@ -331,20 +431,30 @@ namespace Companion.Presentation.Editor
             AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(path);
             AnimatorStateMachine machine = controller.layers[0].stateMachine;
 
-            AnimatorState idle = machine.AddState("Idle");
-            idle.motion = clips["Idle"];
-            machine.defaultState = idle;
+            // Standing is where the room rests: the default state, and where
+            // every one-shot lands.
+            AnimatorState standing = machine.AddState(AvatarPerformance.Standing);
+            standing.motion = clips[AvatarPerformance.Standing];
+            machine.defaultState = standing;
 
-            // One-shot reactions return to Idle on their own, which is what lets
-            // bridge v1 stay free of an `animation.completed` event.
-            foreach (string name in BodyClips.Where(c => c != "Idle"))
+            foreach (string name in BodyClips)
             {
+                if (name == AvatarPerformance.Standing) continue;
                 AnimatorState state = machine.AddState(name);
                 state.motion = clips[name];
-                AnimatorStateTransition transition = state.AddTransition(idle);
+                // Idle and Talk loop until the presentation cues something else.
+                if (LoopingClips.Contains(name)) continue;
+
+                // One-shot reactions return to Standing on their own at their
+                // end, which is what lets bridge v1 stay free of an
+                // `animation.completed` event. They end on the rest pose that
+                // Standing starts from, so the blend is seamless.
+                AnimatorStateTransition transition = state.AddTransition(standing);
                 transition.hasExitTime = true;
                 transition.exitTime = 1f;
-                transition.duration = 0.12f;
+                transition.hasFixedDuration = true;
+                transition.duration = AvatarPerformance.CrossfadeSeconds;
+                transition.offset = 0f;
             }
             EditorUtility.SetDirty(controller);
             return controller;
@@ -352,7 +462,7 @@ namespace Companion.Presentation.Editor
 
         private static GameObject CreatePrefab(
             GameObject model, Material faceMaterial, AnimatorController controller,
-            Texture2D neutral, string path, out Bounds framing)
+            Texture2D neutral, List<FaceClip> faceClips, string path, out Bounds framing)
         {
             framing = new Bounds(Vector3.zero, Vector3.one);
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
@@ -374,7 +484,7 @@ namespace Companion.Presentation.Editor
                 animator.applyRootMotion = false;
 
                 RobertFacePlayer player = instance.AddComponent<RobertFacePlayer>();
-                ConfigureFacePlayer(player, faceRenderer, neutral);
+                ConfigureFacePlayer(player, faceRenderer, neutral, faceClips);
 
                 // Prove the binding the skin controller will demand at runtime,
                 // so a broken face player fails the build instead of showing up
@@ -427,14 +537,13 @@ namespace Companion.Presentation.Editor
         // The approved manifest owns the timings; convert its milliseconds to the
         // seconds the player expects rather than restating them here.
         private static void ConfigureFacePlayer(
-            RobertFacePlayer player, Renderer faceRenderer, Texture2D neutral)
+            RobertFacePlayer player, Renderer faceRenderer, Texture2D neutral, List<FaceClip> clips)
         {
             SerializedObject serialized = new SerializedObject(player);
             serialized.FindProperty("faceRenderer").objectReferenceValue = faceRenderer;
             serialized.FindProperty("defaultFace").objectReferenceValue = neutral;
             serialized.FindProperty("useUnscaledTime").boolValue = true;
 
-            List<FaceClip> clips = ReadFaceClips();
             SerializedProperty array = serialized.FindProperty("clips");
             array.arraySize = clips.Count;
             for (int i = 0; i < clips.Count; i++)
@@ -496,6 +605,72 @@ namespace Companion.Presentation.Editor
             }
             if (result.Count == 0) throw new InvalidOperationException("The face manifest declares no usable clips.");
             return result;
+        }
+
+        /// <summary>
+        /// Every face the bridge can ask for must exist with the right loop
+        /// flag: the paired `idle` and `talk` loops, the one-shot `joy` that
+        /// Wave and Celebrate show, and a one-shot clip for each allowlisted
+        /// emotion other than `neutral`, which shows the neutral PNG instead.
+        /// </summary>
+        private static void CheckFaceCues(List<FaceClip> clips)
+        {
+            var loops = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (FaceClip clip in clips) loops[clip.Name] = clip.Loop;
+
+            var expected = new Dictionary<string, bool>(StringComparer.Ordinal)
+            {
+                { AvatarPerformance.IdleFace, true },
+                { AvatarPerformance.TalkFace, true },
+                { AvatarPerformance.JoyFace, false }
+            };
+            foreach (string emotion in BridgeCommand.Emotions)
+            {
+                if (emotion != AvatarPerformance.Neutral) expected[emotion] = false;
+            }
+            foreach (KeyValuePair<string, bool> face in expected)
+            {
+                bool loop;
+                if (!loops.TryGetValue(face.Key, out loop))
+                {
+                    throw new InvalidOperationException(
+                        "The face manifest " + Manifest + " has no '" + face.Key + "' clip.");
+                }
+                if (loop != face.Value)
+                {
+                    throw new InvalidOperationException(
+                        "Face clip '" + face.Key + "' must be " + (face.Value ? "a loop" : "a one-shot") + ".");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pins the import settings of every face frame the manifest uses,
+        /// following the package's Unity guide: Default, sRGB, bilinear, and
+        /// clamped like the backdrop. The screen's UVs span the whole image, so
+        /// a repeating edge would bleed the opposite border into the face.
+        /// </summary>
+        private static void ConfigureFaceTextures(List<FaceClip> clips)
+        {
+            var names = new SortedSet<string>(StringComparer.Ordinal) { "neutral" };
+            foreach (FaceClip clip in clips) names.UnionWith(clip.Frames);
+            foreach (string name in names)
+            {
+                string path = Faces + "/" + name + ".png";
+                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null) throw new InvalidOperationException("Missing face texture " + path);
+                if (importer.textureType == TextureImporterType.Default && importer.sRGBTexture &&
+                    importer.wrapModeU == TextureWrapMode.Clamp && importer.wrapModeV == TextureWrapMode.Clamp &&
+                    importer.filterMode == FilterMode.Bilinear)
+                {
+                    continue;
+                }
+                importer.textureType = TextureImporterType.Default;
+                importer.sRGBTexture = true;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.filterMode = FilterMode.Bilinear;
+                importer.SaveAndReimport();
+            }
         }
 
         /// <summary>
@@ -638,8 +813,8 @@ namespace Companion.Presentation.Editor
         }
 
         private static string CreateScene(
-            RobertSkinDefinition skin, List<string> outfitAssets, Texture2D neutral, Texture2D happy,
-            Texture2D surprised, Bounds framing)
+            RobertSkinDefinition skin, List<string> outfitAssets, Texture2D neutral,
+            List<FaceClip> faceClips, Bounds framing)
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -698,8 +873,17 @@ namespace Companion.Presentation.Editor
             SerializedObject serializedPresentation = new SerializedObject(presentation);
             serializedPresentation.FindProperty("skinController").objectReferenceValue = controller;
             serializedPresentation.FindProperty("neutralFace").objectReferenceValue = neutral;
-            serializedPresentation.FindProperty("happyFace").objectReferenceValue = happy;
-            serializedPresentation.FindProperty("surprisedFace").objectReferenceValue = surprised;
+            // The face player does not say when a one-shot face has finished,
+            // so the presentation keeps each clip's length to know when to
+            // resume blinking. Taken from the same manifest as the frames.
+            SerializedProperty cues = serializedPresentation.FindProperty("faceCues");
+            cues.arraySize = faceClips.Count;
+            for (int i = 0; i < faceClips.Count; i++)
+            {
+                SerializedProperty cue = cues.GetArrayElementAtIndex(i);
+                cue.FindPropertyRelative("name").stringValue = faceClips[i].Name;
+                cue.FindPropertyRelative("seconds").floatValue = faceClips[i].Durations.Sum();
+            }
             // Re-resolved by path, like the default skin: the scene switch
             // invalidates the instances created before it.
             SerializedProperty outfits = serializedPresentation.FindProperty("outfits");
@@ -719,9 +903,13 @@ namespace Companion.Presentation.Editor
                     throw new InvalidOperationException("The generated scene left outfit " + i + " unassigned.");
                 }
             }
-            foreach (string field in new[] { "skinController", "neutralFace", "happyFace", "surprisedFace" })
+            foreach (string field in new[] { "skinController", "neutralFace" })
             {
                 Require(serializedPresentation, field);
+            }
+            if (serializedPresentation.FindProperty("faceCues").arraySize != faceClips.Count)
+            {
+                throw new InvalidOperationException("The generated scene lost the face clip lengths.");
             }
 
             CompanionBridgeReceiver receiver = bridge.AddComponent<CompanionBridgeReceiver>();
