@@ -9,6 +9,7 @@ import 'package:companion_mobile/domain/models.dart';
 import 'package:companion_mobile/main.dart';
 import 'package:companion_mobile/theme.dart';
 import 'package:companion_mobile/ui/character_stage.dart';
+import 'package:companion_mobile/ui/robert_cues.dart';
 import 'package:companion_mobile/ui/style_page.dart';
 import 'package:companion_mobile/ui/talk_page.dart';
 import 'package:companion_mobile/ui/widgets.dart';
@@ -135,6 +136,87 @@ Future<void> _flush(WidgetTester tester) async {
     await tester.pump();
   }
 }
+
+/// A fixed safeguarding reply, as the service sends it.
+const _safety = {
+  'turnId': 'turn-1',
+  'status': 'completed',
+  'answerType': 'safety',
+  'text': 'You can always talk to a grown-up you trust about this.',
+  'citations': [],
+  'sources': [],
+};
+
+/// A connected controller whose questions are answered at once, in order, by
+/// [replies]. A question past the last one stays pending until the controller
+/// is disposed; it is never a real delay, which the fake clock would never end.
+CompanionController _answering(List<Map<String, Object?>> replies) {
+  var turns = 0;
+  return CompanionController(
+    DemoApi(
+      const DemoConfig(
+          baseUrl: 'http://localhost:8000', token: 'synthetic-token'),
+      client: MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/v1/conversations') {
+          return _json({'conversationId': 'conversation-1'});
+        }
+        if (path == '/v1/conversations/conversation-1') {
+          return http.Response('', 204);
+        }
+        if (path == '/v1/conversations/conversation-1/turns') {
+          turns++;
+          return _json({
+            'turnId': 'turn-$turns',
+            'status': turns <= replies.length ? 'completed' : 'pending',
+          });
+        }
+        final read = RegExp(r'^/v1/turns/turn-(\d+)$').firstMatch(path);
+        if (read != null) {
+          final turn = int.parse(read.group(1)!);
+          return _json(turn <= replies.length
+              ? {...replies[turn - 1], 'turnId': 'turn-$turn'}
+              : {'turnId': 'turn-$turn', 'status': 'pending'});
+        }
+        return http.Response('{}', 404);
+      }),
+    ),
+    wait: (_) => Completer<void>().future,
+  )..connected = true;
+}
+
+/// A room over a fake host, with deadlines generous enough for the fake
+/// clock: `pumpAndSettle` advances it in 100 ms steps.
+AvatarRoom _liveRoom(FakeUnityHost host) => AvatarRoom(
+      commands: host.commands,
+      create: () => AvatarBridge(
+          commands: host.commands,
+          events: host.events,
+          timeout: const Duration(seconds: 30)),
+    );
+
+void _phone(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1200);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+/// Sends [text] from the composer and lets the reply land.
+Future<void> _send(WidgetTester tester, String text) async {
+  await tester.enterText(find.byType(TextField), text);
+  await tester.tap(find.byTooltip('Send test question'));
+  await _flush(tester);
+}
+
+/// Robert's tap target on the character stage.
+Finder get _robert => find
+    .descendant(
+        of: find.byType(CharacterStage), matching: find.byType(GestureDetector))
+    .first;
+
+Finder _tab(String label) =>
+    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
 
 void main() {
   testWidgets(
@@ -590,7 +672,8 @@ void main() {
             isButton: true,
             hasTapAction: true,
             label: 'Say hello to Robert',
-            hint: 'Robert gives a short wave or nod'));
+            // Tapping cycles a wave, a giggle and a wink.
+            hint: 'Robert waves, giggles or winks'));
 
     await tester.tap(find.text('Learn'));
     await tester.pumpAndSettle();
@@ -918,6 +1001,317 @@ void main() {
     expect(find.text('Robert is wearing this.'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  for (final (reply, after) in [
+    (_grounded, ['Nod']),
+    // Calm and serious: Robert talks, then rests, with nothing playful after.
+    (_safety, <String>[]),
+  ]) {
+    testWidgets(
+        'Robert talks while a ${reply['answerType']} reply appears, then '
+        '${after.isEmpty ? 'rests' : 'nods'}', (tester) async {
+      _phone(tester);
+      final host = FakeUnityHost('test/talk_${reply['answerType']}')..install();
+      addTearDown(host.remove);
+      final room = _liveRoom(host);
+      addTearDown(room.dispose);
+      final timers = ManualTimers();
+      final model = _answering([reply]);
+      await tester.pumpWidget(CompanionApp(
+          controller: model, room: room, startTimer: timers.start));
+      await tester.pumpAndSettle();
+      await _flush(tester);
+      expect(room.status, AvatarStatus.ready);
+      expect(host.cues, ['resume', 'Wave'], reason: 'the greeting');
+
+      await _send(tester, 'How do I earn stars?');
+      final text = reply['text'] as String;
+      expect(find.text(text), findsOneWidget);
+      expect(host.cues.last, 'Talk');
+      // Worked out on the phone from the reply's length alone.
+      expect(timers.last.duration, RobertCues.talkDuration(text.runes.length));
+
+      timers.last.fire();
+      await _flush(tester);
+      expect(host.cues, ['resume', 'Wave', 'Talk', 'Standing', ...after]);
+      expect(host.faces, isEmpty);
+      // The words stay in Flutter: neither the question nor the reply, nor any
+      // part of them, reached the room.
+      final wire = jsonEncode(host.sent);
+      expect(wire, isNot(contains('earn stars')));
+      expect(wire, isNot(contains(text)));
+      expect(host.declined, isEmpty);
+      expect(host.refused, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+  }
+
+  testWidgets('clearing the reply stops Robert talking at once',
+      (tester) async {
+    _phone(tester);
+    final host = FakeUnityHost('test/talk_clear')..install();
+    addTearDown(host.remove);
+    final room = _liveRoom(host);
+    addTearDown(room.dispose);
+    final timers = ManualTimers();
+    final model = _answering([_grounded]);
+    await tester.pumpWidget(
+        CompanionApp(controller: model, room: room, startTimer: timers.start));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+    await _send(tester, 'How do I earn stars?');
+    expect(host.cues.last, 'Talk');
+
+    await tester.tap(find.byTooltip('Clear development conversation'));
+    await _flush(tester);
+    expect(find.text('Development conversation cleared.'), findsOneWidget);
+    expect(host.cues.skip(2), ['Talk', 'Standing']);
+    expect(timers.last.isActive, isFalse);
+    // Nothing is left to nod about.
+    timers.last.fire();
+    await _flush(tester);
+    expect(host.cues.skip(2), ['Talk', 'Standing']);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  testWidgets('a new question stops the talk about the last reply',
+      (tester) async {
+    _phone(tester);
+    final host = FakeUnityHost('test/talk_next')..install();
+    addTearDown(host.remove);
+    final room = _liveRoom(host);
+    addTearDown(room.dispose);
+    final timers = ManualTimers();
+    final model = _answering([_grounded]);
+    await tester.pumpWidget(
+        CompanionApp(controller: model, room: room, startTimer: timers.start));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+    await _send(tester, 'How do I earn stars?');
+    expect(host.cues.last, 'Talk');
+
+    // The second question stays pending: Robert is thinking, not talking.
+    await _send(tester, 'And how do I spend them?');
+    expect(find.text(_thinking), findsOneWidget);
+    expect(host.cues.skip(2), ['Talk', 'Standing']);
+    expect(timers.last.isActive, isFalse);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  testWidgets('leaving Talk stops the talk before the room pauses',
+      (tester) async {
+    _phone(tester);
+    final host = FakeUnityHost('test/talk_leave')..install();
+    addTearDown(host.remove);
+    final room = _liveRoom(host);
+    addTearDown(room.dispose);
+    final timers = ManualTimers();
+    final model = _answering([_grounded]);
+    await tester.pumpWidget(
+        CompanionApp(controller: model, room: room, startTimer: timers.start));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+    await _send(tester, 'How do I earn stars?');
+
+    await tester.tap(_tab('Learn'));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+    expect(host.cues.skip(2), ['Talk', 'Standing', 'pause']);
+    expect(timers.last.isActive, isFalse);
+    expect(host.declined, isEmpty);
+
+    // Coming back finds Robert at rest, not finishing an old talk.
+    await tester.tap(_tab('Talk'));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+    expect(host.cues.skip(2), ['Talk', 'Standing', 'pause', 'resume']);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  testWidgets('tapping Robert cycles a wave, a giggle and a wink',
+      (tester) async {
+    _phone(tester);
+    final host = FakeUnityHost('test/tap_cycle')..install();
+    addTearDown(host.remove);
+    final room = _liveRoom(host);
+    addTearDown(room.dispose);
+    await tester.pumpWidget(CompanionApp(room: room));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+    expect(host.cues, ['resume', 'Wave']);
+
+    for (var tap = 0; tap < 4; tap++) {
+      await tester.tap(_robert);
+      await _flush(tester);
+    }
+    expect(host.cues.skip(2), ['Wave', 'face:giggle', 'face:wink', 'Wave']);
+    expect(host.declined, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a look earned on Style brings starry eyes back on Talk',
+      (tester) async {
+    _phone(tester);
+    var owned = false;
+    Map<String, Object> look(
+            String id, String name, int cost, bool isOwned, bool equipped) =>
+        {
+          'id': id,
+          'characterId': 'robert',
+          'name': name,
+          'description': 'A synthetic look.',
+          'cost': cost,
+          'owned': isOwned,
+          'equipped': equipped,
+        };
+    final model = CompanionController(DemoApi(
+      const DemoConfig(
+          baseUrl: 'http://localhost:8000', token: 'synthetic-token'),
+      client: MockClient((request) async {
+        switch (request.url.path) {
+          case '/v1/bootstrap':
+            return _json({
+              'mode': 'development',
+              'characterId': 'robert',
+              'profileId': 'demo-child',
+              'contentStatus': 'awaiting_review',
+              'features': {
+                'voice': false,
+                'generativeAnswers': false,
+                'unity': false
+              },
+            });
+          case '/v1/lessons':
+            return _json(_lessons);
+          case '/v1/rewards':
+            return _json({'balance': owned ? 0 : 5, 'unit': 'learning_stars'});
+          case '/v1/challenges/today':
+            return _json(_challenges(true));
+          case '/v1/inventory':
+            return _json({
+              'items': [
+                look('default', 'Robert Original', 0, true, true),
+                look('sunset', 'Sunset Copper', 5, owned, false),
+              ]
+            });
+          case '/v1/cosmetics/claim':
+            owned = true;
+            return _json({
+              'cosmeticId': 'sunset',
+              'owned': true,
+              'spent': 5,
+              'balance': 0
+            });
+          default:
+            return http.Response('{}', 404);
+        }
+      }),
+    ));
+    final host = FakeUnityHost('test/earned')..install();
+    addTearDown(host.remove);
+    final room = _liveRoom(host);
+    addTearDown(room.dispose);
+    await tester.pumpWidget(CompanionApp(controller: model, room: room));
+    await tester.pumpAndSettle();
+    await tester.tap(_tab('Style'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.text('Connect development service'), 200);
+    await tester.tap(find.text('Connect development service'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Sunset Copper'), -200);
+    await tester.tap(find.text('Earn for 5 stars'));
+    await tester.pumpAndSettle();
+    expect(find.text('Earned · confirmed by the service.'), findsOneWidget);
+    // Robert is off screen here, and a paused room would only drop it.
+    expect(host.faces, isEmpty);
+
+    await tester.tap(_tab('Talk'));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+    expect(host.faces, ['starry']);
+    expect(host.declined, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  testWidgets('finishing the orientation celebrates when Robert is next shown',
+      (tester) async {
+    _phone(tester);
+    final host = FakeUnityHost('test/oriented')..install();
+    addTearDown(host.remove);
+    final room = _liveRoom(host);
+    addTearDown(room.dispose);
+    await tester.pumpWidget(CompanionApp(room: room));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+
+    await tester.tap(_tab('Learn'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Start orientation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start orientation'));
+    await tester.pumpAndSettle();
+    for (var step = 0; step < 2; step++) {
+      await tester.ensureVisible(find.text('Next step'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next step'));
+      await tester.pumpAndSettle();
+    }
+    await tester.ensureVisible(find.text('Finish exploring'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Finish exploring'));
+    await tester.pumpAndSettle();
+    expect(find.text('Explored on this device'), findsOneWidget);
+    expect(host.cues, ['resume', 'Wave', 'pause'],
+        reason: 'nothing is sent to a room that is not showing Robert');
+
+    await tester.tap(_tab('Talk'));
+    await tester.pumpAndSettle();
+    // The starry eyes wait out the reaction spacing behind the celebration.
+    await tester.pump(const Duration(milliseconds: 1300));
+    await _flush(tester);
+    expect(host.cues,
+        ['resume', 'Wave', 'pause', 'resume', 'Celebrate', 'face:starry']);
+    expect(host.declined, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('under reduced motion Robert neither talks nor reacts',
+      (tester) async {
+    _phone(tester);
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final host = FakeUnityHost('test/still')..install();
+    addTearDown(host.remove);
+    final room = _liveRoom(host);
+    addTearDown(room.dispose);
+    final timers = ManualTimers();
+    final model = _answering([_grounded]);
+    await tester.pumpWidget(
+        CompanionApp(controller: model, room: room, startTimer: timers.start));
+    await tester.pumpAndSettle();
+    await _flush(tester);
+    expect(room.status, AvatarStatus.ready);
+    expect(room.animating, isFalse);
+
+    await _send(tester, 'How do I earn stars?');
+    expect(find.text('You earn learning stars by finishing lessons.'),
+        findsOneWidget,
+        reason: 'the reply never depends on the room');
+    expect(timers.started, isEmpty, reason: 'no talk, so nothing to time');
+    await tester.tap(_robert);
+    await _flush(tester);
+    // No resume, no greeting, no Talk, no reaction and no face.
+    expect(host.types, ['avatar.initialize']);
     await tester.pumpWidget(const SizedBox());
     model.dispose();
   });

@@ -8,12 +8,27 @@ import 'package:uuid/uuid.dart';
 
 enum AvatarStatus { staticPreview, connecting, ready }
 
-/// Brief one-shot body clips. The room returns to Idle on its own; Flutter does
-/// not track completion because bridge v1 carries no `animation.completed`.
+/// Brief one-shot body clips. The room returns to Standing on its own; Flutter
+/// does not track completion because bridge v1 carries no
+/// `animation.completed`.
 enum AvatarReaction { wave, nod, celebrate }
 
-/// Face states the room may display. Bridge v1 allows exactly these three.
-enum AvatarEmotion { neutral, happy, surprised }
+/// One-shot faces. The room plays one once and then returns to its resting
+/// blink by itself. These are authored expressions chosen by the app for what
+/// just happened, never emotion recognition.
+enum AvatarEmotion {
+  neutral,
+  happy,
+  surprised,
+  joy,
+  giggle,
+  wink,
+  curious,
+  wow,
+  sleepy,
+  bashful,
+  starry,
+}
 
 /// Presentation commands only; no free-text payload API is exposed to callers.
 class AvatarBridge extends ChangeNotifier {
@@ -50,7 +65,7 @@ class AvatarBridge extends ChangeNotifier {
   final Map<String, Completer<bool>> _pending = {};
   final Set<VoidCallback> _cancelWaits = {};
   final Set<String> _seen = {};
-  final Queue<AvatarReaction> _reactions = Queue();
+  final Queue<_Cue> _reactions = Queue();
   Set<String> _capabilities = {};
   StreamSubscription<dynamic>? _subscription;
   Completer<bool>? _ready;
@@ -61,6 +76,10 @@ class AvatarBridge extends ChangeNotifier {
   bool _disposed = false;
   bool _draining = false;
   bool _greeted = false;
+
+  /// True between [startTalking] and whatever ends the talk: [stopTalking], a
+  /// pause, a fallback or disposal.
+  bool _talking = false;
 
   /// The last policy actually delivered to the room, so repeated UI events do
   /// not resend `app.pause`/`app.resume`.
@@ -91,8 +110,27 @@ class AvatarBridge extends ChangeNotifier {
     'gardener', // outfits
   };
 
+  /// Body clips `avatar.play` may name. Case-sensitive, and exactly the
+  /// schema's list: `Talk` is a body clip here, never the lowercase face.
+  ///
+  /// `Standing` is the resting loop and `Talk` loops until the next play;
+  /// `Idle` is an alias of Standing that the room keeps for older senders and
+  /// this app never sends. The other three are one-shots.
+  static const animations = {
+    'Standing', 'Idle', 'Wave', 'Talk', 'Nod', 'Celebrate', //
+  };
+
+  /// Faces `avatar.set_emotion` may name, exactly the schema's list.
+  static const emotions = {
+    'neutral', 'happy', 'surprised', 'joy', 'giggle', 'wink', //
+    'curious', 'wow', 'sleepy', 'bashful', 'starry',
+  };
+
   /// A burst of taps must not become an animation backlog.
   static const reactionQueueLimit = 3;
+
+  static const _standing = 'Standing';
+  static const _talk = 'Talk';
 
   static const _clips = {
     AvatarReaction.wave: 'Wave',
@@ -100,10 +138,8 @@ class AvatarBridge extends ChangeNotifier {
     AvatarReaction.celebrate: 'Celebrate',
   };
 
-  static const _faces = {
-    AvatarEmotion.neutral: 'neutral',
-    AvatarEmotion.happy: 'happy',
-    AvatarEmotion.surprised: 'surprised',
+  static final _faces = {
+    for (final emotion in AvatarEmotion.values) emotion: emotion.name,
   };
 
   static final _uuid = RegExp(
@@ -129,6 +165,9 @@ class AvatarBridge extends ChangeNotifier {
       _motionEnabled;
 
   bool get motionEnabled => _motionEnabled;
+
+  /// True while the room has been told to loop Talk and nothing has ended it.
+  bool get talking => _talking;
 
   @visibleForTesting
   int get queuedReactions => _reactions.length;
@@ -340,10 +379,50 @@ class AvatarBridge extends ChangeNotifier {
     return result;
   }
 
-  Future<bool> wave() => _send('avatar.play', {'animation': 'Wave'});
+  Future<bool> wave() => _play(_clips[AvatarReaction.wave]!);
 
-  Future<bool> setEmotion(AvatarEmotion emotion) =>
-      _send('avatar.set_emotion', {'emotion': _faces[emotion]!});
+  /// Sends one allowlisted body clip. The last guard before the native
+  /// boundary: a name outside [animations] never leaves Flutter.
+  Future<bool> _play(String clip) async =>
+      animations.contains(clip) &&
+      await _send('avatar.play', {'animation': clip});
+
+  /// Sends one allowlisted face, guarded like [_play].
+  Future<bool> _face(String face) async =>
+      emotions.contains(face) &&
+      await _send('avatar.set_emotion', {'emotion': face});
+
+  /// Starts Robert's Talk loop, which runs until something ends it.
+  ///
+  /// Only the cue crosses the bridge: whatever Robert is "saying" stays in
+  /// Flutter, and so does the decision of how long he says it for. Returns
+  /// false, sending nothing, when the room is not animating — paused, hidden,
+  /// backgrounded or under reduced motion — because talking is body motion.
+  ///
+  /// A reply takes precedence over queued tap reactions, so any backlog is
+  /// dropped rather than played over the talk.
+  bool startTalking() {
+    if (!animating || !_capabilities.contains('avatar.play')) return false;
+    if (_talking) return true;
+    _discardReactions();
+    _talking = true;
+    unawaited(_play(_talk));
+    return true;
+  }
+
+  /// Ends a talk by returning the room to Standing, which also stops the
+  /// talking mouth and brings back the resting blink.
+  ///
+  /// Returns true only when this call ended a live talk. False means there was
+  /// nothing to end: it was never started, or a pause or fallback already ended
+  /// it. Callers use that to decide whether an after-talk cue still belongs.
+  bool stopTalking() {
+    if (!_talking) return false;
+    _talking = false;
+    if (!animating) return false;
+    unawaited(_play(_standing));
+    return true;
+  }
 
   /// The character page became visible or hidden. Leaving the page pauses the
   /// room; ordinary learning and chat continue without it.
@@ -372,7 +451,17 @@ class AvatarBridge extends ChangeNotifier {
     final desired = animating;
     if (desired == _presenting) return;
     _presenting = desired;
-    if (!desired) _discardReactions();
+    if (!desired) {
+      _discardReactions();
+      // A paused room holds the clip it was playing and declines cues until it
+      // resumes, so a talk has to end before the pause, not after it:
+      // otherwise Robert comes back still talking to nobody. Dispatch is
+      // synchronous, so Standing reaches the room ahead of `app.pause`.
+      if (_talking) {
+        _talking = false;
+        unawaited(_play(_standing));
+      }
+    }
     final delivered = await _send(desired ? 'app.resume' : 'app.pause', {});
     if (!delivered || _disposed) return;
     if (desired && !_greeted) {
@@ -381,11 +470,27 @@ class AvatarBridge extends ChangeNotifier {
     }
   }
 
-  /// Queues a brief reaction. Returns false when the room is not animating or
-  /// the bounded queue is full; callers treat that as ordinary, not an error.
-  bool react(AvatarReaction reaction) {
-    if (!animating || _reactions.length >= reactionQueueLimit) return false;
-    _reactions.add(reaction);
+  /// Queues a brief body reaction. Returns false when the room is not
+  /// animating, Robert is talking or the bounded queue is full; callers treat
+  /// that as ordinary, not an error.
+  bool react(AvatarReaction reaction) =>
+      _enqueue(_Cue(face: false, name: _clips[reaction]!));
+
+  /// Queues a one-shot face in the same bounded, spaced queue as [react].
+  ///
+  /// Declined whenever [react] would be. A face changing is motion too — the
+  /// giggle alternates frames, and every face animates back to the resting
+  /// blink — and a paused room declines it anyway. It is also declined while
+  /// Robert talks: a face would cut off the talking mouth, so a talk is ended
+  /// with [stopTalking] first.
+  bool express(AvatarEmotion emotion) =>
+      _enqueue(_Cue(face: true, name: _faces[emotion]!));
+
+  bool _enqueue(_Cue cue) {
+    if (!animating || _talking || _reactions.length >= reactionQueueLimit) {
+      return false;
+    }
+    _reactions.add(cue);
     unawaited(_drainReactions());
     return true;
   }
@@ -395,8 +500,8 @@ class AvatarBridge extends ChangeNotifier {
     _draining = true;
     try {
       while (_reactions.isNotEmpty && animating && !_disposed) {
-        final reaction = _reactions.removeFirst();
-        await _send('avatar.play', {'animation': _clips[reaction]!});
+        final cue = _reactions.removeFirst();
+        await (cue.face ? _face(cue.name) : _play(cue.name));
         if (_disposed || !animating || _reactions.isEmpty) break;
         await _delay(reactionSpacing);
       }
@@ -408,7 +513,7 @@ class AvatarBridge extends ChangeNotifier {
 
   // Timer-based spacing rather than an `animation.completed` event: adding one
   // would expand bridge v1, and the roadmap treats animation cues as
-  // best-effort. The room owns its own return to Idle.
+  // best-effort. The room owns its own return to Standing.
   Future<void> _delay(Duration duration) {
     final completer = Completer<void>();
     _reactionTimer?.cancel();
@@ -463,6 +568,7 @@ class AvatarBridge extends ChangeNotifier {
     if (_disposed) return;
     _cancelDeadlines();
     _discardReactions();
+    _talking = false;
     _capabilities = {};
     _presenting = false;
     if (_ready?.isCompleted == false) _ready!.complete(false);
@@ -478,6 +584,7 @@ class AvatarBridge extends ChangeNotifier {
     _disposed = true;
     _cancelDeadlines();
     _discardReactions();
+    _talking = false;
     if (_ready?.isCompleted == false) _ready!.complete(false);
     for (final completer in _pending.values) {
       if (!completer.isCompleted) completer.complete(false);
@@ -485,4 +592,13 @@ class AvatarBridge extends ChangeNotifier {
     _subscription?.cancel();
     super.dispose();
   }
+}
+
+/// One queued one-shot: a body clip or a face, by allowlisted name only.
+class _Cue {
+  const _Cue({required this.face, required this.name});
+
+  /// True for `avatar.set_emotion`, false for `avatar.play`.
+  final bool face;
+  final String name;
 }

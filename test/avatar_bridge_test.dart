@@ -138,20 +138,16 @@ void main() {
         const MethodChannel('test/ready_events'), null);
   });
 
-  test(
-      'the allowlist is exactly the looks the bridge schema lets the room install',
-      () {
-    // The room refuses anything outside the shared schema, so a look the app
-    // would send but the room would not install is a bug on one side.
+  /// Every value the shared bridge schema allows for payload property [name].
+  Set<String> schemaEnum(String name) {
     final schema = jsonDecode(
         File('contracts/avatar-bridge-v1.schema.json').readAsStringSync());
     final allowed = <String>{};
     void collect(dynamic node) {
       if (node is Map) {
         final properties = node['properties'];
-        if (properties is Map && properties['cosmeticId'] is Map) {
-          allowed.addAll(
-              (properties['cosmeticId']['enum'] as List).cast<String>());
+        if (properties is Map && properties[name] is Map) {
+          allowed.addAll((properties[name]['enum'] as List).cast<String>());
         }
         node.values.forEach(collect);
       } else if (node is List) {
@@ -160,10 +156,26 @@ void main() {
     }
 
     collect(schema);
-    expect(AvatarBridge.cosmetics, allowed);
+    return allowed;
+  }
+
+  test(
+      'the allowlist is exactly the looks the bridge schema lets the room install',
+      () {
+    // The room refuses anything outside the shared schema, so a look the app
+    // would send but the room would not install is a bug on one side.
+    expect(AvatarBridge.cosmetics, schemaEnum('cosmeticId'));
     // Skin folders are written with `_`; cosmetic ids never are.
     expect(AvatarBridge.cosmetics, contains('arab-thobe'));
     expect(AvatarBridge.cosmetics, isNot(contains('arab_thobe')));
+  });
+
+  test('the clips and faces are exactly the ones the bridge schema allows', () {
+    // Same reasoning as the looks: a cue the room would refuse is a bug on one
+    // side, and names are case-sensitive (`Talk` is a body clip, `talk` the
+    // face cycle).
+    expect(AvatarBridge.animations, schemaEnum('animation'));
+    expect(AvatarBridge.emotions, schemaEnum('emotion'));
   });
 
   test('invalid high-sequence events cannot poison later valid handshake',

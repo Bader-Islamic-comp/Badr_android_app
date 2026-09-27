@@ -17,10 +17,16 @@ class StylePage extends StatelessWidget {
     super.key,
     required this.model,
     required this.onEquipped,
+    this.onEarned,
   });
 
   final CompanionController model;
+
+  /// Called only once the service confirms the look is worn.
   final VoidCallback onEquipped;
+
+  /// Called only once the service confirms the look was earned.
+  final VoidCallback? onEarned;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -192,7 +198,9 @@ class StylePage extends StatelessWidget {
     return FilledButton(
       onPressed: model.busy || !affordable
           ? null
-          : () => model.claimCosmetic(cosmetic),
+          : () async {
+              if (await model.claimCosmetic(cosmetic)) onEarned?.call();
+            },
       child: Text('Earn for ${cosmetic.cost} stars'),
     );
   }
