@@ -5,15 +5,21 @@ those listed under `flutter: assets:` in `pubspec.yaml` actually ship. Archives,
 Blender sources, build tooling output and design files are deliberately kept out
 of here.
 
-- `robert/Robert.png` — the staged static-avatar preview used by the Flutter
-  fallback. This is the supplied preview render, not newly generated art.
-- `characters/robert/` — the portable character package: `character.json`
-  catalogue, `skins/default/` (GLB model and editable Blender source),
-  `shared/faces/default/` (face PNGs and timing), `shared/rig_contract.json`,
-  `unity/` helper scripts, `tools/` reproducible build and verification scripts,
-  `previews/` and `validation/`.
+- `robert/` — the portable character package. Its guides are `README.md` (the
+  model, the face screen and the layout), `ANIMATIONS.md` (the six body clips:
+  lengths, looping, face pairing and playback guidance) and `SKINS.md` (the six
+  outfits: ids, files and compatibility). Beside them: the `character.json`
+  catalogue, seven skins under `skins/` (each a GLB model and editable Blender
+  source with the six body clips), `shared/faces/default/` (face PNGs, including
+  the eight `cute_*` expressions, and their timing), `shared/animations.json`
+  (body clips and face pairing), `shared/rig_contract.json`, `unity/` helper
+  scripts, `tools/` reproducible build, animation and verification scripts,
+  `previews/` and `validation/`. Only `robert/Robert.png` ships in the app: it
+  is the static-avatar preview used by the Flutter fallback.
+- `looks/` — the Style tab's outfit thumbnails, downscaled from
+  `robert/previews/<skin>.png`.
 
-The Unity room imports from `characters/robert/`; see
+The Unity room imports from `robert/`; see
 [`../unity/README.md`](../unity/README.md). Copy only the selected runtime
 assets and helper scripts into a Unity project — exclude archives, Blender
 sources, logs and verification scripts from runtime asset folders.
@@ -23,7 +29,7 @@ Not in this directory:
 - `../design/` — the `ui.make` Figma layout source and `ui-reference.png`.
 - `../archive/` — superseded character revisions and the packaged
   `Robert_character.zip`. Untracked; reproducible with
-  `characters/robert/tools/package_asset.py`.
+  `robert/tools/package_asset.py`.
 
-Add future characters beside `robert`; add future Robert skins beneath
-`characters/robert/skins`.
+Add future Robert skins beneath `robert/skins`. The package moved here from
+`characters/robert/` on 2026-09-27, when the animation update replaced it.

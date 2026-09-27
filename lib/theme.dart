@@ -37,7 +37,7 @@ const cosmeticSwatches = {
 };
 
 /// Rendered thumbnails of the modelled outfits, from each skin's own Blender
-/// scene (`assets/characters/robert/tools/render_skin_preview.py`). An outfit
+/// scene (`assets/robert/tools/render_skin_preview.py`). An outfit
 /// changes Robert's shape, so a colour dot cannot show it.
 const cosmeticPreviews = {
   'casual': 'assets/looks/casual.png',

@@ -1,0 +1,118 @@
+{
+  "skins": [
+    {
+      "skin": "default",
+      "clips": {
+        "Standing": 6.0,
+        "Idle": 6.0,
+        "Wave": 3.2,
+        "Talk": 4.8,
+        "Nod": 1.6,
+        "Celebrate": 2.4
+      },
+      "loop_seams_passed": true,
+      "max_fixed_bone_error": 0.0,
+      "face_visibility_pose_samples": 138,
+      "glb_sha256": "50a6e86933badcc79169ac6bc6b5ce50db836afc7d8b666e72206cae8f1c46a2",
+      "blend_sha256": "782363b2a7f7c9eab4fb748708fe9e943bf1c17c046cd6a78a82c73c66095e6e"
+    },
+    {
+      "skin": "cowboy",
+      "clips": {
+        "Standing": 6.0,
+        "Idle": 6.0,
+        "Wave": 3.2,
+        "Talk": 4.8,
+        "Nod": 1.6,
+        "Celebrate": 2.4
+      },
+      "loop_seams_passed": true,
+      "max_fixed_bone_error": 0.0,
+      "face_visibility_pose_samples": 138,
+      "glb_sha256": "1d5daa9c40c4ab71f63fcf6a760be380af677c8f7b2a3ce212e1b2dd67272ddd",
+      "blend_sha256": "d91acfe0e66c990dbaaba6b4db85eb8437fe6001afcb1e3fc05aae4bdd7c5585"
+    },
+    {
+      "skin": "astronaut",
+      "clips": {
+        "Standing": 6.0,
+        "Idle": 6.0,
+        "Wave": 3.2,
+        "Talk": 4.8,
+        "Nod": 1.6,
+        "Celebrate": 2.4
+      },
+      "loop_seams_passed": true,
+      "max_fixed_bone_error": 0.0,
+      "face_visibility_pose_samples": 138,
+      "glb_sha256": "183a55a95a45a340ad5ec8e1774ec81195b1ba5ad58c57e902b4adfbff89b7f9",
+      "blend_sha256": "d4c438bddb2058cc507d2165155744f162842341c722246bbe4eb6d4581aa96c"
+    },
+    {
+      "skin": "arab_thobe",
+      "clips": {
+        "Standing": 6.0,
+        "Idle": 6.0,
+        "Wave": 3.2,
+        "Talk": 4.8,
+        "Nod": 1.6,
+        "Celebrate": 2.4
+      },
+      "loop_seams_passed": true,
+      "max_fixed_bone_error": 0.0,
+      "face_visibility_pose_samples": 138,
+      "glb_sha256": "b25d1e212524669f9408c520f84621d038697aaede374628616efdc16d6d4bd2",
+      "blend_sha256": "347e2017b7724c03fbf942d8e8a95f5f55085b2206ba6497885f6479ec4c401f"
+    },
+    {
+      "skin": "casual",
+      "clips": {
+        "Standing": 6.0,
+        "Idle": 6.0,
+        "Wave": 3.2,
+        "Talk": 4.8,
+        "Nod": 1.6,
+        "Celebrate": 2.4
+      },
+      "loop_seams_passed": true,
+      "max_fixed_bone_error": 0.0,
+      "face_visibility_pose_samples": 138,
+      "glb_sha256": "cb161eed547285d91f6c788b34160a7adc2c50e5e7e5093170466336e48fca33",
+      "blend_sha256": "5fdd489cca41e2aa19a3e69d59f95bc92174e26c7b4f6b73d9c30ff7eecedd7c"
+    },
+    {
+      "skin": "explorer",
+      "clips": {
+        "Standing": 6.0,
+        "Idle": 6.0,
+        "Wave": 3.2,
+        "Talk": 4.8,
+        "Nod": 1.6,
+        "Celebrate": 2.4
+      },
+      "loop_seams_passed": true,
+      "max_fixed_bone_error": 0.0,
+      "face_visibility_pose_samples": 138,
+      "glb_sha256": "a8c47edced85a44f77be97016b783780b67a0aa65bfda2f7f886645f735747c5",
+      "blend_sha256": "0206829289bf5456575e9486d781e89a9a4e903ae344d4b370032278fd486c9c"
+    },
+    {
+      "skin": "gardener",
+      "clips": {
+        "Standing": 6.0,
+        "Idle": 6.0,
+        "Wave": 3.2,
+        "Talk": 4.8,
+        "Nod": 1.6,
+        "Celebrate": 2.4
+      },
+      "loop_seams_passed": true,
+      "max_fixed_bone_error": 0.0,
+      "face_visibility_pose_samples": 138,
+      "glb_sha256": "d369e24a4faf19d15054e5ef47c2d888bab3d2af596ecead783ed003df9fadcd",
+      "blend_sha256": "a5392babc15705f851af1b7d92fb11329b5c37e1cf39764d484232a267c4d5df"
+    }
+  ],
+  "same_animation_data_across_skins": true,
+  "unity_tested": false
+}

@@ -180,7 +180,7 @@ exists, feeding it the `unity.*` properties from the export's own
 
 ### Acceptance evidence, item by item
 
-1. Asset validation — **not run.** `assets/characters/robert/tools/verify_robert.py`
+1. Asset validation — **not run.** `assets/robert/tools/verify_robert.py`
    exists and was not executed; no user asset was overwritten.
 2. Unity and Android host compile and 3D runtime loading — **partial.** Both
    compile, the receiver is exercised by EditMode tests, and on an x86_64
