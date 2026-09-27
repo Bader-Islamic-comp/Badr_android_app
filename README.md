@@ -19,7 +19,7 @@ implemented.
 |---|---|
 | `lib/` | Application source: `bridge/`, `data/`, `domain/`, `ui/` |
 | `assets/` | Runtime assets only — the static preview, the shared room backdrop and the Robert character package |
-| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus from the emulator `room-on-device.png`, `customization-tab.png`, `thinking-bubble.png`, `grounded-answer.png`, `redirect-reply.png`, and the casual-chat set `chat-reply.png`, `chat-invitation.png`, `chat-feeling.png` and `faith-abstain.png`, and the outfit set `style-outfits.png`, `outfit-thobe.png` and `outfit-cowboy.png` |
+| `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus from the emulator `room-on-device.png`, `customization-tab.png`, `thinking-bubble.png`, `grounded-answer.png`, `redirect-reply.png`, and the casual-chat set `chat-reply.png`, `chat-invitation.png`, `chat-feeling.png` and `faith-abstain.png`, and the outfit set `style-outfits.png`, `outfit-thobe.png` and `outfit-cowboy.png`, and the animation set `robert-greeting-wave.png`, `face-giggle.png`, `face-wink.png`, `robert-talking.png` and `face-starry.png` |
 | `unity/` | The Unity character-room project, its room builder and its test scripts |
 | `archive/` | Untracked: superseded character revisions and the packaged distributable |
 | `contracts/` | Versioned API and bridge schemas shared with `comp-server` |
@@ -111,13 +111,64 @@ Presentation policy lives in the bridge:
   foreground and allowed to move. Any of those going false sends `app.pause`.
 - A greeting wave runs once per successfully initialized room, not on every
   return to the page.
-- Reactions (`Wave`, `Nod`, `Celebrate`) go through a bounded queue with
-  spacing, so a burst of taps cannot become an animation backlog. Pausing
-  discards the backlog rather than replaying it later. The room returns to Idle
-  on its own; bridge v1 has no `animation.completed` and was not extended to add
-  one.
+- One-shot cues — the body reactions `Wave`, `Nod` and `Celebrate`, and the
+  faces — go through one bounded queue with spacing, so a burst of taps cannot
+  become an animation backlog. Pausing discards the backlog rather than
+  replaying it later. The room returns to `Standing`, its resting loop with
+  blinking, on its own; bridge v1 has no `animation.completed` and was not
+  extended to add one.
 - Reduced motion follows the platform setting and can be overridden from the
-  parent area. Animation is never required to understand a reply.
+  parent area. It pauses the room, so no cue of any kind is sent: no `Talk`, no
+  reaction and no face (every face animates back to the resting blink, and a
+  paused room declines them anyway). Animation is never required to understand
+  a reply.
+
+### Robert's talk and reactions
+
+Every cue is a local, deterministic flourish from the bridge's allowlists —
+`avatar.play` names `Standing`, `Idle`, `Wave`, `Talk`, `Nod` or `Celebrate`,
+and `avatar.set_emotion` one of eleven faces. There is no free-text cue API.
+`lib/ui/robert_cues.dart` picks the cues; it sees a reply only as its answer
+type and its length, so no question or reply text can reach Unity.
+
+- **Talking.** When a reply is released on Talk, Robert loops `Talk` and then
+  returns to `Standing`. How long is worked out on the phone from the reply's
+  length: 55 ms a character (an unhurried speaking pace), at least 1.5 s so a
+  "Hi!" still reads as talking, and at most 7 s, about one and a half Talk
+  loops, so a long library answer is not a minute of gesturing while the child
+  reads. The talk also ends at once when the reply is cleared, a new question
+  starts, the child leaves Talk, the room pauses or the app is backgrounded.
+  The bridge sends `Standing` before any `app.pause`, so a paused room never
+  resumes mid-talk.
+- **After talking**, by answer type: `grounded` and `reviewed_answer` get a
+  `Nod`; `abstained` the `curious` face. `chat`, `safety`, `redirected` and
+  `unavailable` get no face at all: Robert talks, then rests. Chat is included
+  because the service's reply to a sad feeling is also `chat`, and the app may
+  not read a reply to tell them apart. Taps and faces are declined while he
+  talks, because a face would cut off the talking mouth.
+- **Tapping Robert** cycles a `Wave`, the `giggle` face and the `wink` face.
+- **Earning a look** gives the `starry` face; **wearing one** a `Celebrate`;
+  **finishing the orientation** a `Celebrate` and then `starry`. The room is
+  paused on every page but Talk, so these wait for Robert to be shown again,
+  once, and only the latest is kept; backgrounding the app forgets it. None of
+  them is tied to faith practice or worship: they are presentation, not rewards.
+- `sleepy`, `wow` and `bashful`, and the older `happy` and `surprised`, have no
+  trigger yet.
+
+On the Android 16 emulator, against the development harness (grounded answers
+off), Robert's resting `Standing` loop keeps moving, and:
+
+| Screenshot | What it shows |
+|---|---|
+| [`design/robert-greeting-wave.png`](design/robert-greeting-wave.png) | the greeting `Wave` |
+| [`design/face-giggle.png`](design/face-giggle.png) | a tap's `giggle` face, the right way up |
+| [`design/face-wink.png`](design/face-wink.png) | a tap's `wink` face, the right way up |
+| [`design/robert-talking.png`](design/robert-talking.png) | `Talk` while an `unavailable` reply appears: the mouth cycle and an arm gesture |
+| [`design/face-starry.png`](design/face-starry.png) | the `starry` face, about 0.5 s after returning to Talk from earning Casual on Style |
+
+The `curious` face after an abstention, the `Nod` after a grounded answer,
+reduced motion, a skin swap during Talk, and pause and resume on a device have
+not been seen yet.
 
 Fallback is terminal for a bridge instance: a failed transport does not reset
 the native receiver's sequence or initialization state. `AvatarRoom` is the
@@ -137,7 +188,7 @@ Unity.
 
 ## Prepare and run
 
-Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 81 tests
+Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 127 tests
 pass. Dependency versions are recorded in `pubspec.lock`.
 
 The SDK is **vendored, not installed**: it lives beside the repositories at
@@ -169,9 +220,14 @@ requests `INTERNET` only — no microphone, camera or location permission.
 
 The app has been run on an **Android 16 x86_64 emulator**: the character room
 renders, the bridge handshake completes, an earned colour look sent over the
-bridge recolours the character, and an earned outfit swaps in its model. **No physical device has been used**, so startup, memory, frame
-time, ARM64, TalkBack, keyboard insets and rotation are all still unmeasured,
-and no performance budget has been approved to measure against.
+bridge recolours the character, and an earned outfit swaps in its model. Since
+the animation update Robert keeps moving at rest, the greeting wave plays,
+taps show the giggle and wink faces, he talks while a reply appears, and an
+earned look's starry face plays on returning to Talk (see
+[Robert's talk and reactions](#roberts-talk-and-reactions)). **No physical
+device has been used**, so startup, memory, frame time, ARM64, TalkBack,
+keyboard insets and rotation are all still unmeasured, and no performance
+budget has been approved to measure against.
 
 `android/settings.gradle.kts` includes the exported Unity room as
 `:unityLibrary` **only when `unity/export/unityLibrary` exists**, so the app
@@ -349,7 +405,7 @@ sources are further down.
 
 ## Verification coverage and remaining work
 
-The 86-test suite covers no-network default mode, server-owned rewards,
+The 127-test suite covers no-network default mode, server-owned rewards,
 ownership rejection, idempotent completion headers, resuming known question
 turns, the bootstrap's grounded-answers flag, polling a pending turn to its
 deadline and resuming it, every turn-contract rule, clearing and disposal
@@ -359,7 +415,11 @@ missing native host, malformed bridge events, cancellation of native deadlines
 on disposal, asynchronous send/delete disposal, offline orientation,
 320px/large-text layout, the character-page visibility and foreground policy,
 reduced motion, the bounded reaction queue, coordinated room recreation and its
-bound, and activatable button semantics for the orientation controls.
+bound, activatable button semantics for the orientation controls, and Robert's
+talk and reactions: talk time from reply length, the talk ending on clear, a
+new question, leaving Talk or a pause, the after-talk cue for every answer
+type, the tap cycle, held celebrations, reduced motion sending nothing, and
+the clip and face allowlists matching the bridge schema.
 
 Five of those tests cover the customization tab specifically: that a look is
 earned from the service rather than granted on the device, that the balance is
@@ -394,9 +454,10 @@ buttons missing from the accessibility tree. They are now exposed as buttons
 with labels, hints and tap actions, asserted in the widget tests and confirmed
 again in the browser accessibility tree.
 
-The Unity kit is compiled and exercised separately in a real Editor: 36
-engine-free checks over the bridge decision core plus 12 EditMode tests over the
-receiver. See [`unity/README.md`](unity/README.md) for what the room builder,
+The Unity kit is compiled and exercised separately in a real Editor: 93
+engine-free checks over the bridge decision core and the cue allowlists, plus 41
+EditMode tests over the receiver, the presentation's body and face rules and the
+room's generated assets. See [`unity/README.md`](unity/README.md) for what the room builder,
 the desert backdrop and the emulator run do and do not settle.
 
 Remaining gates include native host integration and device validation, real
