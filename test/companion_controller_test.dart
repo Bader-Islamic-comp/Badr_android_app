@@ -192,6 +192,39 @@ void main() {
       await model.connect();
       expect(model.connected, isTrue);
       expect(model.groundedAnswers, isTrue);
+      expect(model.unreviewedDrafts, isFalse);
+      model.dispose();
+    });
+
+    test('a corpus preview is recorded, announced, and forgotten on reconnect',
+        () async {
+      var status = 'unreviewed_drafts';
+      final model = CompanionController(DemoApi(config,
+          client: MockClient((request) async => switch (request.url.path) {
+                '/v1/bootstrap' => _json({
+                    ...bootstrap,
+                    'contentStatus': status,
+                    'features': {
+                      'voice': false,
+                      'generativeAnswers': true,
+                      'unity': false
+                    },
+                  }),
+                '/v1/lessons' => _json(lessons),
+                '/v1/inventory' => _json(inventory),
+                '/v1/rewards' =>
+                  _json({'balance': 0, 'unit': 'learning_stars'}),
+                '/v1/challenges/today' => _json({'items': []}),
+                _ => http.Response('{}', 404),
+              })));
+      await model.connect();
+      expect(model.unreviewedDrafts, isTrue);
+      expect(model.notice, contains('unreviewed drafts'));
+      status = 'awaiting_review';
+      await model.connect();
+      expect(model.unreviewedDrafts, isFalse);
+      expect(
+          model.notice, 'Connected to the adult-operated development service.');
       model.dispose();
     });
 

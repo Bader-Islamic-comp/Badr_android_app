@@ -6,6 +6,37 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-09-30 (corpus preview)
+
+On branch `corpus-tasks`, paired with the server's `corpus-tasks` branch. The product owner's
+request of 2026-09-30, verbatim:
+
+> "fix 1 and 2 on the corpus-tasks branch, download the the pinned sources, apply changes also to
+> the android in a separate branch. after you are done, test the RAG system with corpus using the
+> android app. Give out a report of all your findings."
+
+The server's corpus is Arabic and every document in it is a draft. The server can now serve it to
+an adult operator as a corpus preview (`comp-server/doc/rag-system.md` §9.1). This is what the app
+needs to show it honestly.
+
+### Changed
+
+- **Bootstrap** accepts `contentStatus: "unreviewed_drafts"` as well as `"awaiting_review"` and
+  returns `(groundedAnswers, unreviewedDrafts)`. Drafts reported without grounded answers are
+  refused, like any other unexpected service. `contracts/openapi-v1.json` is synced from the server.
+- **Corpus preview on Talk**: a notice stays above Robert ("Corpus preview: answers come from
+  unreviewed drafts. For adult testing only, not for children."). A library reply is labelled
+  "Unreviewed draft · adult testing only" in orange instead of "From Robert’s library". The composer
+  hint and the connection notice say the same.
+- **Right-to-left text**: a reply, a source title or reference, and the question being typed each
+  take their direction from their first strong letter (`lib/ui/text_direction.dart`), so Arabic reads
+  right to left inside the app's left-to-right layout. English text is laid out exactly as before.
+
+### Verification
+
+- `flutter analyze`: no issues. `flutter test`: **135 passed** (127 before; 8 new, in
+  `test/corpus_preview_test.dart`, `test/demo_api_test.dart` and `test/companion_controller_test.dart`).
+
 ## Unreleased — 2026-09-27 (animations)
 
 Commits `7705441` (the package), `8576283` (the Unity room) and `91ed49d` (the app) on

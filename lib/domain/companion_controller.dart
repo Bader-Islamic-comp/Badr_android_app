@@ -69,6 +69,11 @@ class CompanionController extends ChangeNotifier {
   /// Whether the connected service reported grounded answers as on. False
   /// whenever nothing is connected.
   bool groundedAnswers = false;
+
+  /// Whether the connected service is an adult operator's corpus preview, so
+  /// its library replies come from unreviewed draft content. False whenever
+  /// nothing is connected.
+  bool unreviewedDrafts = false;
   bool orientationComplete = false;
   bool serverChallengeComplete = false;
   int? balance;
@@ -156,13 +161,18 @@ class CompanionController extends ChangeNotifier {
   Future<void> connect() => _operate(() async {
         connected = false;
         groundedAnswers = false;
+        unreviewedDrafts = false;
         balance = null;
         serverChallengeComplete = false;
-        final grounded = await api.bootstrap();
+        final service = await api.bootstrap();
         await _refresh();
-        groundedAnswers = grounded;
+        groundedAnswers = service.groundedAnswers;
+        unreviewedDrafts = service.unreviewedDrafts;
         connected = true;
-        notice = 'Connected to the adult-operated development service.';
+        notice = service.unreviewedDrafts
+            ? 'Connected to a corpus preview: answers come from unreviewed '
+                'drafts, for adult testing only.'
+            : 'Connected to the adult-operated development service.';
       });
 
   Future<void> _refresh() async {

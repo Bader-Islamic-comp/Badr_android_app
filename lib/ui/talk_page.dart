@@ -6,6 +6,7 @@ import '../domain/companion_controller.dart';
 import '../domain/models.dart';
 import '../theme.dart';
 import 'character_stage.dart';
+import 'text_direction.dart';
 
 /// The character-first main page.
 ///
@@ -43,6 +44,7 @@ class TalkPage extends StatelessWidget {
           final replyLimit = (height * 0.42).clamp(96.0, 340.0);
           final reply = _reply(context);
           return Column(children: [
+            if (model.unreviewedDrafts) _previewNotice(),
             if (showCharacter)
               Expanded(
                 child: Padding(
@@ -85,11 +87,14 @@ class TalkPage extends StatelessWidget {
   /// child, and a label is there to say where a reply came from; chat claims
   /// to come from nowhere, so it says nothing. Left bare, it also cannot be
   /// mistaken for a library reply, which is always named and always sourced.
-  static (String, Color)? labelFor(ReplyType type) => switch (type) {
-        ReplyType.grounded || ReplyType.reviewedAnswer => (
-            'From Robert’s library',
-            teal
-          ),
+  ///
+  /// In an operator's corpus preview ([drafts]) the library is unreviewed
+  /// draft content, so a library reply says that instead, in orange.
+  static (String, Color)? labelFor(ReplyType type, {bool drafts = false}) =>
+      switch (type) {
+        ReplyType.grounded || ReplyType.reviewedAnswer => drafts
+            ? ('Unreviewed draft · adult testing only', orange)
+            : ('From Robert’s library', teal),
         ReplyType.chat => null,
         ReplyType.abstained => ('Robert isn’t sure', muted),
         ReplyType.redirected => ('Let’s ask a grown-up', orange),
@@ -143,7 +148,8 @@ class TalkPage extends StatelessWidget {
                     const Text('Nothing to show from this conversation.',
                         style: TextStyle(fontSize: 15, color: muted))
                   else ...[
-                    Text(reply.text,
+                    // Arabic replies read right to left; the page stays LTR.
+                    directionalText(reply.text,
                         style: Theme.of(context).textTheme.bodyLarge),
                     if (reply.type.cited && reply.sources.isNotEmpty)
                       _sources(reply.sources),
@@ -198,12 +204,12 @@ class TalkPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(source.title,
+                          directionalText(source.title,
                               style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: ink)),
-                          Text(source.reference,
+                          directionalText(source.reference,
                               style:
                                   const TextStyle(fontSize: 13, color: muted)),
                         ]),
@@ -216,8 +222,26 @@ class TalkPage extends StatelessWidget {
   /// reply and asks the service to delete the conversation it came from. It
   /// stays usable while Robert is thinking, which also stops the wait. With no
   /// label, while thinking or for chat, the row carries the × alone.
+  /// Always visible in a corpus preview, above the character: every library
+  /// reply on this page comes from draft content no scholar has reviewed.
+  Widget _previewNotice() => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+            color: orange.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12)),
+        child: const Text(
+            'Corpus preview: answers come from unreviewed drafts. '
+            'For adult testing only, not for children.',
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600, color: ink)),
+      );
+
   Widget _bubbleHeader(Reply? reply) {
-    final label = reply == null ? null : labelFor(reply.type);
+    final label = reply == null
+        ? null
+        : labelFor(reply.type, drafts: model.unreviewedDrafts);
     return Row(children: [
       Expanded(
           child: label == null

@@ -99,9 +99,25 @@ void main() {
           'generativeAnswers': grounded,
           'unity': false,
         }));
-        expect(await api.bootstrap(), grounded);
+        expect(await api.bootstrap(),
+            (groundedAnswers: grounded, unreviewedDrafts: false));
         api.close();
       }
+    });
+
+    test('reports an operator corpus preview serving unreviewed drafts',
+        () async {
+      final api = serving({
+        ...development(features: {
+          'voice': false,
+          'generativeAnswers': true,
+          'unity': false,
+        }),
+        'contentStatus': 'unreviewed_drafts',
+      });
+      expect(await api.bootstrap(),
+          (groundedAnswers: true, unreviewedDrafts: true));
+      api.close();
     });
 
     final refused = <String, Map<String, dynamic>>{
@@ -125,6 +141,14 @@ void main() {
       'another character': {...development(), 'characterId': 'someone'},
       'another profile': {...development(), 'profileId': 'real-child'},
       'reviewed content': {...development(), 'contentStatus': 'published'},
+      'drafts without grounded answers': {
+        ...development(),
+        'contentStatus': 'unreviewed_drafts',
+      },
+      'a content status that is not a string': {
+        ...development(),
+        'contentStatus': ['unreviewed_drafts'],
+      },
     };
     for (final entry in refused.entries) {
       test('refuses a service with ${entry.key}', () async {

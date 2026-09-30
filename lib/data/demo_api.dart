@@ -88,27 +88,37 @@ class DemoApi {
   }
 
   /// Confirms this is the development-only service and returns whether it has
-  /// grounded answers switched on.
+  /// grounded answers switched on, and whether those answers come from
+  /// unreviewed drafts.
   ///
-  /// That is the one feature the service may report as on, and only the
-  /// service decides it: the app never turns answers on, it only learns
-  /// whether they are. Everything else stays as strict as before — voice on,
-  /// another mode or reviewed content would each mean a service this build was
-  /// not made for.
-  Future<bool> bootstrap() async {
+  /// Grounded answers are the one feature the service may report as on, and
+  /// only the service decides it: the app never turns answers on, it only
+  /// learns whether they are. The one other value it accepts is the adult
+  /// operator's corpus preview (`contentStatus: unreviewed_drafts`,
+  /// `comp-server/doc/rag-system.md` §9.1), which the app then labels on every
+  /// library reply; drafts without answers make no sense and are refused.
+  /// Everything else stays as strict as before — voice on, another mode or
+  /// reviewed content would each mean a service this build was not made for.
+  Future<({bool groundedAnswers, bool unreviewedDrafts})> bootstrap() async {
     final result = await request('GET', '/v1/bootstrap');
     final features = result['features'];
+    final status = result['contentStatus'];
     if (result['mode'] != 'development' ||
         result['characterId'] != 'robert' ||
         result['profileId'] != 'demo-child' ||
-        result['contentStatus'] != 'awaiting_review' ||
+        (status != 'awaiting_review' && status != 'unreviewed_drafts') ||
         features is! Map ||
         features['voice'] != false ||
-        features['generativeAnswers'] is! bool) {
+        features['generativeAnswers'] is! bool ||
+        (status == 'unreviewed_drafts' &&
+            features['generativeAnswers'] != true)) {
       throw const DemoApiException(
           'This app requires the development-only service.');
     }
-    return features['generativeAnswers'] as bool;
+    return (
+      groundedAnswers: features['generativeAnswers'] as bool,
+      unreviewedDrafts: status == 'unreviewed_drafts',
+    );
   }
 
   Future<Map<String, dynamic>> completeLesson(String key) =>

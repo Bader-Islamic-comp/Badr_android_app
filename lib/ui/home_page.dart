@@ -14,6 +14,7 @@ import 'quests_page.dart';
 import 'robert_cues.dart';
 import 'style_page.dart';
 import 'talk_page.dart';
+import 'text_direction.dart';
 import 'widgets.dart';
 
 enum CompanionDestination { talk, learn, quests, style }
@@ -340,32 +341,39 @@ class _CompanionHomeState extends State<CompanionHome>
         color: room.surfaceAttached ? ivoryScrim : Colors.transparent,
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(
-            child: TextField(
-              controller: question,
-              maxLength: 1000,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              enabled: !model.busy && !model.canRetryQuestion,
-              onSubmitted: (_) => model.busy ? null : _ask(),
-              decoration: InputDecoration(
-                counterText: '',
-                isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                // Friendly, but still says the text is for testing: this is a
-                // development build and nothing real belongs in it. Kept short
-                // so that at 320 px and 2× text it wraps less than the old
-                // hint did, not more.
-                hintText: model.connected
-                    ? 'Say hi or ask (test text only)'
-                    : 'Connect the development service to ask',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: const BorderSide(color: hairline)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: const BorderSide(color: hairline)),
+            // An Arabic question is typed right to left, like its reply.
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: question,
+              builder: (context, value, _) => TextField(
+                controller: question,
+                textDirection: directionOf(value.text),
+                maxLength: 1000,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.send,
+                enabled: !model.busy && !model.canRetryQuestion,
+                onSubmitted: (_) => model.busy ? null : _ask(),
+                decoration: InputDecoration(
+                  counterText: '',
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  // Friendly, but still says the text is for testing: this is a
+                  // development build and nothing real belongs in it. Kept short
+                  // so that at 320 px and 2× text it wraps less than the old
+                  // hint did, not more.
+                  hintText: !model.connected
+                      ? 'Connect the development service to ask'
+                      : model.unreviewedDrafts
+                          ? 'Ask the draft corpus (adults only)'
+                          : 'Say hi or ask (test text only)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(999),
+                      borderSide: const BorderSide(color: hairline)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(999),
+                      borderSide: const BorderSide(color: hairline)),
+                ),
               ),
             ),
           ),
