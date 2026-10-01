@@ -65,6 +65,29 @@ void main() {
     });
   });
 
+  group('isolateNumberRanges', () {
+    test('keeps a verse range in its written order inside Arabic text', () {
+      const title = 'سورة يوسف 12:36\u201342';
+      expect(isolateNumberRanges(title), 'سورة يوسف \u206612:36\u201342\u2069');
+      expect(isolateNumberRanges('الحديث رقم 13'), 'الحديث رقم 13',
+          reason: 'a single number needs no isolate');
+      expect(isolateNumberRanges('quran:2:255 and 1/3'),
+          'quran:\u20662:255\u2069 and \u20661/3\u2069');
+    });
+
+    testWidgets(
+        'a right-to-left source title shows its range isolated; English is untouched',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+          home: Column(children: [
+        directionalText('سورة يوسف 12:36\u201342'),
+        directionalText('Sura 12:36\u201342'),
+      ])));
+      expect(find.text('سورة يوسف \u206612:36\u201342\u2069'), findsOneWidget);
+      expect(find.text('Sura 12:36\u201342'), findsOneWidget);
+    });
+  });
+
   test('a library reply in a corpus preview is labelled as an unreviewed draft',
       () {
     for (final type in [ReplyType.grounded, ReplyType.reviewedAnswer]) {

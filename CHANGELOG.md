@@ -6,6 +6,32 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-10-01 (test/corpus-tasks)
+
+On branch `test/corpus-tasks`, paired with the server's branch of the same name. The product owner's request
+of 2026-10-01, verbatim:
+
+> "ok, do the solutions that you recommended in the report in a branch called "test: corpus-tasks". I suggest
+> that you add tafsir Ibn Katheer for each Surah and Ayah available in the corpus and create a Knowledge Graph
+> that connects between the tafsir, Quran, Hadith and Prophet's names. After that, I will let the team review
+> it and submit any finding."
+
+Git branch names cannot contain ": " or spaces, so the branch is `test/corpus-tasks`. The server does nearly
+all of the work (Arabic safety routing, the faith prompt and judge, Ibn Kathir, the knowledge graph); the app
+has one display fix.
+
+### Fixed
+
+- **Verse ranges read backwards in Arabic text.** On the emulator a source titled "سورة يوسف 12:36–42" showed
+  "42–12:36", because inside right-to-left text the numbers around a dash are ordered right to left.
+  `directionalText` now wraps each number range of right-to-left text in a left-to-right isolate
+  (`isolateNumberRanges`, U+2066 … U+2069); English text is unchanged.
+
+### Verification
+
+- `flutter analyze`: no issues. `flutter test`: **137 passed** (135 before; 2 new in
+  `test/corpus_preview_test.dart`).
+
 ## Unreleased — 2026-09-30 (corpus preview)
 
 On branch `corpus-tasks`, paired with the server's `corpus-tasks` branch. The product owner's

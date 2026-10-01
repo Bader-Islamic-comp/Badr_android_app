@@ -18,12 +18,27 @@ TextDirection directionOf(String text) {
       : TextDirection.ltr;
 }
 
+/// A number range or reference ("12:36\u201342", "2:255", "1/3"): digits joined by
+/// a colon, dash, slash or point.
+final _numberRun =
+    RegExp(r'[0-9\u0660-\u0669]+(?:[:/.\u2013\u2014-][0-9\u0660-\u0669]+)+');
+
+/// [text] with every number range wrapped in a left-to-right isolate (U+2066
+/// ... U+2069). Inside right-to-left text the bidi algorithm orders the
+/// numbers around a dash from right to left, so "12:36\u201342" would read
+/// "42\u201312:36"; isolated, it reads as written. Only for right-to-left text.
+String isolateNumberRanges(String text) =>
+    text.replaceAllMapped(_numberRun, (match) => '\u2066${match[0]}\u2069');
+
 /// [text] in its own direction. Right-to-left text takes the full width so
 /// that a short line starts at the right edge, where an Arabic reader looks
-/// first; left-to-right text is laid out exactly as a plain [Text].
+/// first, and its number ranges are isolated ([isolateNumberRanges]);
+/// left-to-right text is laid out exactly as a plain [Text].
 Widget directionalText(String text, {TextStyle? style}) {
   final direction = directionOf(text);
-  final widget = Text(text, style: style, textDirection: direction);
+  final shown =
+      direction == TextDirection.rtl ? isolateNumberRanges(text) : text;
+  final widget = Text(shown, style: style, textDirection: direction);
   return direction == TextDirection.rtl
       ? SizedBox(width: double.infinity, child: widget)
       : widget;
