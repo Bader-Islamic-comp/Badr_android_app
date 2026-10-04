@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../bridge/avatar_bridge.dart';
 import '../bridge/avatar_room.dart';
@@ -230,7 +231,8 @@ class _CompanionHomeState extends State<CompanionHome>
                                               fontSize: 14))))),
                       ])),
                   Expanded(child: _page()),
-                  if (onCharacterPage) _composer(),
+                  if (onCharacterPage)
+                    Shortcuts(shortcuts: _clipboardKeys, child: _composer()),
                 ]),
               ),
             ),
@@ -335,6 +337,18 @@ class _CompanionHomeState extends State<CompanionHome>
             onEquipped: cues.lookWorn,
           ),
       };
+
+  /// A hardware keyboard's own Paste, Copy and Cut keys (Android's
+  /// KEYCODE_PASTE, _COPY and _CUT). Flutter maps Ctrl+V, Ctrl+C and Ctrl+X
+  /// for a text field, but not these, so without this they did nothing.
+  static final _clipboardKeys = <ShortcutActivator, Intent>{
+    const SingleActivator(LogicalKeyboardKey.paste):
+        const PasteTextIntent(SelectionChangedCause.keyboard),
+    const SingleActivator(LogicalKeyboardKey.copy):
+        CopySelectionTextIntent.copy,
+    const SingleActivator(LogicalKeyboardKey.cut):
+        const CopySelectionTextIntent.cut(SelectionChangedCause.keyboard),
+  };
 
   Widget _composer() => Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
