@@ -6,6 +6,35 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-10-04 (test/corpus-tasks)
+
+Fixes for what the emulator showed against the server's corpus preview.
+
+### Fixed
+
+- **Source references read backwards and in machine form.** An Arabic answer's source read
+  "حزمة بدر العربية للمسابقة · 7:19-23:quran": the number range was isolated without its `quran:` tag, so
+  right-to-left text put it first. `isolateNumberRanges` now isolates a tag written onto the numbers with
+  them. Recognised references also read as a child would say them (`lib/ui/source_reference.dart`):
+  `quran:7:19-23` as `7:19–23`, `quran:12:87–quran:12:93` as `12:87–93` (as "سورة يوسف 12:87–93" when the
+  source title names the surah), and `bukhari:6324` / `muslim_abdulbaqi:591` as "البخاري 6324" / "مسلم 591"
+  in an Arabic reply, "Bukhari 6324" / "Muslim 591" in an English one. Each part of the line is isolated and
+  the line runs in the reply's direction; any other reference is shown as sent, and
+  `ReplySource.reference` keeps the raw text.
+- **Connecting was hidden from Talk.** Talk's hint asked for a connection, but the buttons were on Quests,
+  Style and in the parent area. Until a configured build is connected, a link button ("Connect development
+  service") takes the send button's place in the composer. Connecting stays user initiated: nothing
+  connects on startup.
+- **The Paste key did nothing with a hardware keyboard.** Flutter maps Ctrl+V/C/X for a text field but not a
+  keyboard's own Paste, Copy and Cut keys (Android's `KEYCODE_PASTE`, `_COPY`, `_CUT`); the composer now
+  maps them. Nothing in the app blocked Ctrl+V, which a new test exercises too; if Ctrl+V still fails on
+  the emulator, the key is not reaching the app.
+
+### Verification
+
+- `flutter analyze`: no issues. `flutter test`: **146 passed** (137 before; 6 new in
+  `test/source_reference_test.dart`, 2 in `test/widget_test.dart`, 1 in `test/composer_keys_test.dart`).
+
 ## Unreleased — 2026-10-01 (test/corpus-tasks)
 
 On branch `test/corpus-tasks`, paired with the server's branch of the same name. The product owner's request
