@@ -72,7 +72,13 @@ void main() {
       expect(isolateNumberRanges('الحديث رقم 13'), 'الحديث رقم 13',
           reason: 'a single number needs no isolate');
       expect(isolateNumberRanges('quran:2:255 and 1/3'),
-          'quran:\u20662:255\u2069 and \u20661/3\u2069');
+          '\u2066quran:2:255\u2069 and \u20661/3\u2069',
+          reason: 'a tag written onto the numbers is isolated with them');
+      expect(isolateNumberRanges('حزمة · quran:7:19-23'),
+          'حزمة · \u2066quran:7:19-23\u2069',
+          reason: 'or it would read 7:19-23:quran');
+      expect(isolateNumberRanges('مسودة · quran:12:87\u2013quran:12:93'),
+          'مسودة · \u2066quran:12:87\u2013quran:12:93\u2069');
     });
 
     testWidgets(

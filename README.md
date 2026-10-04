@@ -394,7 +394,12 @@ infers the label from the text:
 
 Only library replies carry sources. Each one appears under the text as a title
 with its reference beneath, in plain text, because there is nothing on the
-phone to open. A reply of any other type that carries sources is refused,
+phone to open. A reference the app recognises reads as a child would say it,
+in the reply's direction: `quran:7:19-23` as `7:19–23`, a span
+`quran:12:87–quran:12:93` as `12:87–93` (with the surah's name when the
+title gives it), `bukhari:6324` as "البخاري 6324" in an Arabic reply and
+"Bukhari 6324" in an English one; any other reference is shown as sent
+(`lib/ui/source_reference.dart`). A reply of any other type that carries sources is refused,
 including chat. Chat has no label because a label says where a reply came
 from, and chat claims to come from nowhere; left bare, it cannot be mistaken
 for a library reply, which is always named and sourced. The labels stay calm,

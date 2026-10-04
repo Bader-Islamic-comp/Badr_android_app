@@ -6,6 +6,7 @@ import '../domain/companion_controller.dart';
 import '../domain/models.dart';
 import '../theme.dart';
 import 'character_stage.dart';
+import 'source_reference.dart';
 import 'text_direction.dart';
 
 /// The character-first main page.
@@ -152,7 +153,7 @@ class TalkPage extends StatelessWidget {
                     directionalText(reply.text,
                         style: Theme.of(context).textTheme.bodyLarge),
                     if (reply.type.cited && reply.sources.isNotEmpty)
-                      _sources(reply.sources),
+                      _sources(reply),
                   ],
                 ]),
           ),
@@ -183,7 +184,7 @@ class TalkPage extends StatelessWidget {
 
   /// Where a library reply came from, under its text. Plain text rather than
   /// links: there is nothing on the phone to open.
-  Widget _sources(List<ReplySource> sources) => Container(
+  Widget _sources(Reply reply) => Container(
         margin: const EdgeInsets.only(top: 12),
         padding: const EdgeInsets.only(top: 10),
         width: double.infinity,
@@ -196,7 +197,7 @@ class TalkPage extends StatelessWidget {
               const Text('Sources',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700, color: muted)),
-              for (final source in sources)
+              for (final source in reply.sources)
                 MergeSemantics(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 6),
@@ -209,14 +210,31 @@ class TalkPage extends StatelessWidget {
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: ink)),
-                          directionalText(source.reference,
-                              style:
-                                  const TextStyle(fontSize: 13, color: muted)),
+                          _reference(source, directionOf(reply.text)),
                         ]),
                   ),
                 ),
             ]),
       );
+
+  /// A reference the app recognises, shown readably ([SourceReference]) and
+  /// running the way the reply does, so in an Arabic reply it lines up with
+  /// the Arabic title above it. Any other reference is shown as sent.
+  Widget _reference(ReplySource source, TextDirection replyDirection) {
+    const style = TextStyle(fontSize: 13, color: muted);
+    final readable = SourceReference.parse(source.reference,
+        title: source.title, arabic: replyDirection == TextDirection.rtl);
+    if (readable == null) {
+      return directionalText(source.reference, style: style);
+    }
+    final line = Text(readable.display,
+        style: style,
+        textDirection: replyDirection,
+        semanticsLabel: readable.plain);
+    return replyDirection == TextDirection.rtl
+        ? SizedBox(width: double.infinity, child: line)
+        : line;
+  }
 
   /// Clearing is the one control that belongs beside the reply: it removes the
   /// reply and asks the service to delete the conversation it came from. It

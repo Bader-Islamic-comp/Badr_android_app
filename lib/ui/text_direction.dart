@@ -19,9 +19,14 @@ TextDirection directionOf(String text) {
 }
 
 /// A number range or reference ("12:36\u201342", "2:255", "1/3"): digits joined by
-/// a colon, dash, slash or point.
-final _numberRun =
-    RegExp(r'[0-9\u0660-\u0669]+(?:[:/.\u2013\u2014-][0-9\u0660-\u0669]+)+');
+/// a colon, dash, slash or point. A Latin tag written onto the numbers
+/// ("quran:7:19-23", "quran:12:87\u2013quran:12:93") belongs to the run: with
+/// only the numbers isolated, right-to-left text puts them before their tag
+/// and "quran:7:19-23" reads "7:19-23:quran".
+const _digits = r'[0-9\u0660-\u0669]+';
+const _tag = r'(?:[A-Za-z][A-Za-z_]*:)?';
+const _joiner = r'[:/.\u2013\u2014-]';
+final _numberRun = RegExp('$_tag$_digits(?:$_joiner$_tag$_digits)+');
 
 /// [text] with every number range wrapped in a left-to-right isolate (U+2066
 /// ... U+2069). Inside right-to-left text the bidi algorithm orders the
