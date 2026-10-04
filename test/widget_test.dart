@@ -820,6 +820,74 @@ void main() {
     model.dispose();
   });
 
+  testWidgets('a configured build connects from Talk, when asked to',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final paths = <String>[];
+    final model = CompanionController(DemoApi(
+      const DemoConfig(
+          baseUrl: 'http://localhost:8000', token: 'synthetic-token'),
+      client: MockClient((request) async {
+        paths.add(request.url.path);
+        switch (request.url.path) {
+          case '/v1/bootstrap':
+            return _json({
+              'mode': 'development',
+              'characterId': 'robert',
+              'profileId': 'demo-child',
+              'contentStatus': 'awaiting_review',
+              'features': {
+                'voice': false,
+                'generativeAnswers': true,
+                'unity': false
+              },
+            });
+          case '/v1/lessons':
+            return _json(_lessons);
+          case '/v1/rewards':
+            return _json({'balance': 11, 'unit': 'learning_stars'});
+          case '/v1/challenges/today':
+            return _json(_challenges(false));
+          case '/v1/inventory':
+            return _json(_inventory);
+          default:
+            return http.Response('{}', 404);
+        }
+      }),
+    ));
+    await tester.pumpWidget(CompanionApp(controller: model));
+    await tester.pumpAndSettle();
+    expect(paths, isEmpty, reason: 'connecting is never automatic');
+    expect(find.text('Connect the development service to ask'), findsOneWidget);
+    expect(find.byTooltip('Send test question'), findsNothing,
+        reason: 'sending could only ask for a connection again');
+
+    await tester.tap(find.byTooltip('Connect development service'));
+    await tester.pumpAndSettle();
+    expect(paths.first, '/v1/bootstrap');
+    expect(model.connected, isTrue);
+    expect(find.text('Connected to the adult-operated development service.'),
+        findsOneWidget);
+    expect(find.byTooltip('Connect development service'), findsNothing);
+    expect(find.byTooltip('Send test question'), findsOneWidget);
+    expect(find.text('Say hi or ask (test text only)'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
+  });
+
+  testWidgets('a build with no service offers no connection on Talk',
+      (tester) async {
+    await tester.pumpWidget(const CompanionApp());
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Connect development service'), findsNothing);
+    expect(find.byTooltip('Send test question'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('the page only paints transparently when a room is behind it',
       (tester) async {
     tester.view.physicalSize = const Size(800, 1200);

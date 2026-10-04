@@ -381,16 +381,27 @@ class _CompanionHomeState extends State<CompanionHome>
           SizedBox(
             width: 52,
             height: 52,
-            child: IconButton.filled(
-              tooltip: model.canRetryQuestion
-                  ? 'Retry the same request'
-                  : 'Send test question',
-              onPressed: model.busy ? null : _ask,
-              icon: Icon(model.canRetryQuestion
-                  ? Icons.refresh_rounded
-                  : Icons.arrow_upward_rounded),
-            ),
+            child: _connectsHere
+                ? IconButton.filled(
+                    tooltip: 'Connect development service',
+                    onPressed: model.busy ? null : model.connect,
+                    icon: const Icon(Icons.link_rounded),
+                  )
+                : IconButton.filled(
+                    tooltip: model.canRetryQuestion
+                        ? 'Retry the same request'
+                        : 'Send test question',
+                    onPressed: model.busy ? null : _ask,
+                    icon: Icon(model.canRetryQuestion
+                        ? Icons.refresh_rounded
+                        : Icons.arrow_upward_rounded),
+                  ),
           ),
         ]),
       );
+
+  /// A configured build that is not connected yet connects from the composer:
+  /// its hint asks for a connection, and sending could only say the same
+  /// again. Connecting stays something an adult does, never automatic.
+  bool get _connectsHere => !model.connected && model.api.config.enabled;
 }

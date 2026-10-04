@@ -14,8 +14,8 @@ import 'text_direction.dart';
 /// Deliberately sparse: the character, and the one reply it last gave. With no
 /// reply yet there is nothing on the page but Robert. Earlier answers are not
 /// kept, the orientation prompt lives on Learn, the service connection lives on
-/// Quests, Style and the parent area, and the room's own state and retry live
-/// in the parent area — a page that is mostly character reads as a companion,
+/// Quests, Style and the parent area (and in the composer until it is made),
+/// and the room's own state and retry live in the parent area — a page that is mostly character reads as a companion,
 /// and a stack of cards does not. The composer lives in the shell so it stays
 /// above the keyboard.
 class TalkPage extends StatelessWidget {

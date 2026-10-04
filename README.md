@@ -274,7 +274,9 @@ are embedded in the binary and are **not** appropriate for production secrets or
 authentication.
 
 Connection is user initiated from the connection card on Quests, Style or the
-parent area. The bootstrap must identify the synthetic development profile,
+parent area, or from Talk: until a configured build is connected, a link button
+takes the send button's place in the composer, whose hint asks for a
+connection. Nothing connects automatically. The bootstrap must identify the synthetic development profile,
 disabled voice and awaiting-review content. `features.generativeAnswers` is the
 one feature the service may report as on, and it must be a real boolean. The
 app records it and never turns it on, and the parent area shows whether it is
@@ -336,7 +338,7 @@ To try it:
    listed in
    [`comp-server/doc/rag-system.md`](../comp-server/doc/rag-system.md) §9.
 2. Connect the app as usual: the same `DEMO_API_URL` and `DEMO_API_TOKEN` as
-   above, then connect from Quests, Style or the parent area. The parent area
+   above, then connect from Talk's composer, Quests, Style or the parent area. The parent area
    should then read "Grounded answers: on · development corpus". If it reads
    "Grounded answers: off", the server was started without them.
 3. Ask on Talk. The composer's hint reads "Say hi or ask (test text only)".
