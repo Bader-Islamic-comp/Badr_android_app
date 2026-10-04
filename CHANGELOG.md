@@ -6,6 +6,92 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-10-04 (test/corpus-tasks)
+
+Fixes for what the emulator showed against the server's corpus preview.
+
+### Fixed
+
+- **Source references read backwards and in machine form.** An Arabic answer's source read
+  "حزمة بدر العربية للمسابقة · 7:19-23:quran": the number range was isolated without its `quran:` tag, so
+  right-to-left text put it first. `isolateNumberRanges` now isolates a tag written onto the numbers with
+  them. Recognised references also read as a child would say them (`lib/ui/source_reference.dart`):
+  `quran:7:19-23` as `7:19–23`, `quran:12:87–quran:12:93` as `12:87–93` (as "سورة يوسف 12:87–93" when the
+  source title names the surah), and `bukhari:6324` / `muslim_abdulbaqi:591` as "البخاري 6324" / "مسلم 591"
+  in an Arabic reply, "Bukhari 6324" / "Muslim 591" in an English one. Each part of the line is isolated and
+  the line runs in the reply's direction; any other reference is shown as sent, and
+  `ReplySource.reference` keeps the raw text.
+- **Connecting was hidden from Talk.** Talk's hint asked for a connection, but the buttons were on Quests,
+  Style and in the parent area. Until a configured build is connected, a link button ("Connect development
+  service") takes the send button's place in the composer. Connecting stays user initiated: nothing
+  connects on startup.
+- **The Paste key did nothing with a hardware keyboard.** Flutter maps Ctrl+V/C/X for a text field but not a
+  keyboard's own Paste, Copy and Cut keys (Android's `KEYCODE_PASTE`, `_COPY`, `_CUT`); the composer now
+  maps them. Nothing in the app blocked Ctrl+V, which a new test exercises too; if Ctrl+V still fails on
+  the emulator, the key is not reaching the app.
+
+### Verification
+
+- `flutter analyze`: no issues. `flutter test`: **146 passed** (137 before; 6 new in
+  `test/source_reference_test.dart`, 2 in `test/widget_test.dart`, 1 in `test/composer_keys_test.dart`).
+
+## Unreleased — 2026-10-01 (test/corpus-tasks)
+
+On branch `test/corpus-tasks`, paired with the server's branch of the same name. The product owner's request
+of 2026-10-01, verbatim:
+
+> "ok, do the solutions that you recommended in the report in a branch called "test: corpus-tasks". I suggest
+> that you add tafsir Ibn Katheer for each Surah and Ayah available in the corpus and create a Knowledge Graph
+> that connects between the tafsir, Quran, Hadith and Prophet's names. After that, I will let the team review
+> it and submit any finding."
+
+Git branch names cannot contain ": " or spaces, so the branch is `test/corpus-tasks`. The server does nearly
+all of the work (Arabic safety routing, the faith prompt and judge, Ibn Kathir, the knowledge graph); the app
+has one display fix.
+
+### Fixed
+
+- **Verse ranges read backwards in Arabic text.** On the emulator a source titled "سورة يوسف 12:36–42" showed
+  "42–12:36", because inside right-to-left text the numbers around a dash are ordered right to left.
+  `directionalText` now wraps each number range of right-to-left text in a left-to-right isolate
+  (`isolateNumberRanges`, U+2066 … U+2069); English text is unchanged.
+
+### Verification
+
+- `flutter analyze`: no issues. `flutter test`: **137 passed** (135 before; 2 new in
+  `test/corpus_preview_test.dart`).
+
+## Unreleased — 2026-09-30 (corpus preview)
+
+On branch `corpus-tasks`, paired with the server's `corpus-tasks` branch. The product owner's
+request of 2026-09-30, verbatim:
+
+> "fix 1 and 2 on the corpus-tasks branch, download the the pinned sources, apply changes also to
+> the android in a separate branch. after you are done, test the RAG system with corpus using the
+> android app. Give out a report of all your findings."
+
+The server's corpus is Arabic and every document in it is a draft. The server can now serve it to
+an adult operator as a corpus preview (`comp-server/doc/rag-system.md` §9.1). This is what the app
+needs to show it honestly.
+
+### Changed
+
+- **Bootstrap** accepts `contentStatus: "unreviewed_drafts"` as well as `"awaiting_review"` and
+  returns `(groundedAnswers, unreviewedDrafts)`. Drafts reported without grounded answers are
+  refused, like any other unexpected service. `contracts/openapi-v1.json` is synced from the server.
+- **Corpus preview on Talk**: a notice stays above Robert ("Corpus preview: answers come from
+  unreviewed drafts. For adult testing only, not for children."). A library reply is labelled
+  "Unreviewed draft · adult testing only" in orange instead of "From Robert’s library". The composer
+  hint and the connection notice say the same.
+- **Right-to-left text**: a reply, a source title or reference, and the question being typed each
+  take their direction from their first strong letter (`lib/ui/text_direction.dart`), so Arabic reads
+  right to left inside the app's left-to-right layout. English text is laid out exactly as before.
+
+### Verification
+
+- `flutter analyze`: no issues. `flutter test`: **135 passed** (127 before; 8 new, in
+  `test/corpus_preview_test.dart`, `test/demo_api_test.dart` and `test/companion_controller_test.dart`).
+
 ## Unreleased — 2026-09-27 (animations)
 
 Commits `7705441` (the package), `8576283` (the Unity room) and `91ed49d` (the app) on

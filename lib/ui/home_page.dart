@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../bridge/avatar_bridge.dart';
 import '../bridge/avatar_room.dart';
@@ -14,6 +15,7 @@ import 'quests_page.dart';
 import 'robert_cues.dart';
 import 'style_page.dart';
 import 'talk_page.dart';
+import 'text_direction.dart';
 import 'widgets.dart';
 
 enum CompanionDestination { talk, learn, quests, style }
@@ -229,7 +231,8 @@ class _CompanionHomeState extends State<CompanionHome>
                                               fontSize: 14))))),
                       ])),
                   Expanded(child: _page()),
-                  if (onCharacterPage) _composer(),
+                  if (onCharacterPage)
+                    Shortcuts(shortcuts: _clipboardKeys, child: _composer()),
                 ]),
               ),
             ),
@@ -335,37 +338,56 @@ class _CompanionHomeState extends State<CompanionHome>
           ),
       };
 
+  /// A hardware keyboard's own Paste, Copy and Cut keys (Android's
+  /// KEYCODE_PASTE, _COPY and _CUT). Flutter maps Ctrl+V, Ctrl+C and Ctrl+X
+  /// for a text field, but not these, so without this they did nothing.
+  static final _clipboardKeys = <ShortcutActivator, Intent>{
+    const SingleActivator(LogicalKeyboardKey.paste):
+        const PasteTextIntent(SelectionChangedCause.keyboard),
+    const SingleActivator(LogicalKeyboardKey.copy):
+        CopySelectionTextIntent.copy,
+    const SingleActivator(LogicalKeyboardKey.cut):
+        const CopySelectionTextIntent.cut(SelectionChangedCause.keyboard),
+  };
+
   Widget _composer() => Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         color: room.surfaceAttached ? ivoryScrim : Colors.transparent,
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(
-            child: TextField(
-              controller: question,
-              maxLength: 1000,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              enabled: !model.busy && !model.canRetryQuestion,
-              onSubmitted: (_) => model.busy ? null : _ask(),
-              decoration: InputDecoration(
-                counterText: '',
-                isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                // Friendly, but still says the text is for testing: this is a
-                // development build and nothing real belongs in it. Kept short
-                // so that at 320 px and 2× text it wraps less than the old
-                // hint did, not more.
-                hintText: model.connected
-                    ? 'Say hi or ask (test text only)'
-                    : 'Connect the development service to ask',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: const BorderSide(color: hairline)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: const BorderSide(color: hairline)),
+            // An Arabic question is typed right to left, like its reply.
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: question,
+              builder: (context, value, _) => TextField(
+                controller: question,
+                textDirection: directionOf(value.text),
+                maxLength: 1000,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.send,
+                enabled: !model.busy && !model.canRetryQuestion,
+                onSubmitted: (_) => model.busy ? null : _ask(),
+                decoration: InputDecoration(
+                  counterText: '',
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  // Friendly, but still says the text is for testing: this is a
+                  // development build and nothing real belongs in it. Kept short
+                  // so that at 320 px and 2× text it wraps less than the old
+                  // hint did, not more.
+                  hintText: !model.connected
+                      ? 'Connect the development service to ask'
+                      : model.unreviewedDrafts
+                          ? 'Ask the draft corpus (adults only)'
+                          : 'Say hi or ask (test text only)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(999),
+                      borderSide: const BorderSide(color: hairline)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(999),
+                      borderSide: const BorderSide(color: hairline)),
+                ),
               ),
             ),
           ),
@@ -373,16 +395,27 @@ class _CompanionHomeState extends State<CompanionHome>
           SizedBox(
             width: 52,
             height: 52,
-            child: IconButton.filled(
-              tooltip: model.canRetryQuestion
-                  ? 'Retry the same request'
-                  : 'Send test question',
-              onPressed: model.busy ? null : _ask,
-              icon: Icon(model.canRetryQuestion
-                  ? Icons.refresh_rounded
-                  : Icons.arrow_upward_rounded),
-            ),
+            child: _connectsHere
+                ? IconButton.filled(
+                    tooltip: 'Connect development service',
+                    onPressed: model.busy ? null : model.connect,
+                    icon: const Icon(Icons.link_rounded),
+                  )
+                : IconButton.filled(
+                    tooltip: model.canRetryQuestion
+                        ? 'Retry the same request'
+                        : 'Send test question',
+                    onPressed: model.busy ? null : _ask,
+                    icon: Icon(model.canRetryQuestion
+                        ? Icons.refresh_rounded
+                        : Icons.arrow_upward_rounded),
+                  ),
           ),
         ]),
       );
+
+  /// A configured build that is not connected yet connects from the composer:
+  /// its hint asks for a connection, and sending could only say the same
+  /// again. Connecting stays something an adult does, never automatic.
+  bool get _connectsHere => !model.connected && model.api.config.enabled;
 }

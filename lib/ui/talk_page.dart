@@ -6,14 +6,16 @@ import '../domain/companion_controller.dart';
 import '../domain/models.dart';
 import '../theme.dart';
 import 'character_stage.dart';
+import 'source_reference.dart';
+import 'text_direction.dart';
 
 /// The character-first main page.
 ///
 /// Deliberately sparse: the character, and the one reply it last gave. With no
 /// reply yet there is nothing on the page but Robert. Earlier answers are not
 /// kept, the orientation prompt lives on Learn, the service connection lives on
-/// Quests, Style and the parent area, and the room's own state and retry live
-/// in the parent area — a page that is mostly character reads as a companion,
+/// Quests, Style and the parent area (and in the composer until it is made),
+/// and the room's own state and retry live in the parent area — a page that is mostly character reads as a companion,
 /// and a stack of cards does not. The composer lives in the shell so it stays
 /// above the keyboard.
 class TalkPage extends StatelessWidget {
@@ -43,6 +45,7 @@ class TalkPage extends StatelessWidget {
           final replyLimit = (height * 0.42).clamp(96.0, 340.0);
           final reply = _reply(context);
           return Column(children: [
+            if (model.unreviewedDrafts) _previewNotice(),
             if (showCharacter)
               Expanded(
                 child: Padding(
@@ -85,11 +88,14 @@ class TalkPage extends StatelessWidget {
   /// child, and a label is there to say where a reply came from; chat claims
   /// to come from nowhere, so it says nothing. Left bare, it also cannot be
   /// mistaken for a library reply, which is always named and always sourced.
-  static (String, Color)? labelFor(ReplyType type) => switch (type) {
-        ReplyType.grounded || ReplyType.reviewedAnswer => (
-            'From Robert’s library',
-            teal
-          ),
+  ///
+  /// In an operator's corpus preview ([drafts]) the library is unreviewed
+  /// draft content, so a library reply says that instead, in orange.
+  static (String, Color)? labelFor(ReplyType type, {bool drafts = false}) =>
+      switch (type) {
+        ReplyType.grounded || ReplyType.reviewedAnswer => drafts
+            ? ('Unreviewed draft · adult testing only', orange)
+            : ('From Robert’s library', teal),
         ReplyType.chat => null,
         ReplyType.abstained => ('Robert isn’t sure', muted),
         ReplyType.redirected => ('Let’s ask a grown-up', orange),
@@ -143,10 +149,11 @@ class TalkPage extends StatelessWidget {
                     const Text('Nothing to show from this conversation.',
                         style: TextStyle(fontSize: 15, color: muted))
                   else ...[
-                    Text(reply.text,
+                    // Arabic replies read right to left; the page stays LTR.
+                    directionalText(reply.text,
                         style: Theme.of(context).textTheme.bodyLarge),
                     if (reply.type.cited && reply.sources.isNotEmpty)
-                      _sources(reply.sources),
+                      _sources(reply),
                   ],
                 ]),
           ),
@@ -177,7 +184,7 @@ class TalkPage extends StatelessWidget {
 
   /// Where a library reply came from, under its text. Plain text rather than
   /// links: there is nothing on the phone to open.
-  Widget _sources(List<ReplySource> sources) => Container(
+  Widget _sources(Reply reply) => Container(
         margin: const EdgeInsets.only(top: 12),
         padding: const EdgeInsets.only(top: 10),
         width: double.infinity,
@@ -190,7 +197,7 @@ class TalkPage extends StatelessWidget {
               const Text('Sources',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700, color: muted)),
-              for (final source in sources)
+              for (final source in reply.sources)
                 MergeSemantics(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 6),
@@ -198,26 +205,61 @@ class TalkPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(source.title,
+                          directionalText(source.title,
                               style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: ink)),
-                          Text(source.reference,
-                              style:
-                                  const TextStyle(fontSize: 13, color: muted)),
+                          _reference(source, directionOf(reply.text)),
                         ]),
                   ),
                 ),
             ]),
       );
 
+  /// A reference the app recognises, shown readably ([SourceReference]) and
+  /// running the way the reply does, so in an Arabic reply it lines up with
+  /// the Arabic title above it. Any other reference is shown as sent.
+  Widget _reference(ReplySource source, TextDirection replyDirection) {
+    const style = TextStyle(fontSize: 13, color: muted);
+    final readable = SourceReference.parse(source.reference,
+        title: source.title, arabic: replyDirection == TextDirection.rtl);
+    if (readable == null) {
+      return directionalText(source.reference, style: style);
+    }
+    final line = Text(readable.display,
+        style: style,
+        textDirection: replyDirection,
+        semanticsLabel: readable.plain);
+    return replyDirection == TextDirection.rtl
+        ? SizedBox(width: double.infinity, child: line)
+        : line;
+  }
+
   /// Clearing is the one control that belongs beside the reply: it removes the
   /// reply and asks the service to delete the conversation it came from. It
   /// stays usable while Robert is thinking, which also stops the wait. With no
   /// label, while thinking or for chat, the row carries the × alone.
+  /// Always visible in a corpus preview, above the character: every library
+  /// reply on this page comes from draft content no scholar has reviewed.
+  Widget _previewNotice() => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+            color: orange.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12)),
+        child: const Text(
+            'Corpus preview: answers come from unreviewed drafts. '
+            'For adult testing only, not for children.',
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600, color: ink)),
+      );
+
   Widget _bubbleHeader(Reply? reply) {
-    final label = reply == null ? null : labelFor(reply.type);
+    final label = reply == null
+        ? null
+        : labelFor(reply.type, drafts: model.unreviewedDrafts);
     return Row(children: [
       Expanded(
           child: label == null

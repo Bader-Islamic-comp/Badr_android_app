@@ -274,7 +274,9 @@ are embedded in the binary and are **not** appropriate for production secrets or
 authentication.
 
 Connection is user initiated from the connection card on Quests, Style or the
-parent area. The bootstrap must identify the synthetic development profile,
+parent area, or from Talk: until a configured build is connected, a link button
+takes the send button's place in the composer, whose hint asks for a
+connection. Nothing connects automatically. The bootstrap must identify the synthetic development profile,
 disabled voice and awaiting-review content. `features.generativeAnswers` is the
 one feature the service may report as on, and it must be a real boolean. The
 app records it and never turns it on, and the parent area shows whether it is
@@ -336,7 +338,7 @@ To try it:
    listed in
    [`comp-server/doc/rag-system.md`](../comp-server/doc/rag-system.md) §9.
 2. Connect the app as usual: the same `DEMO_API_URL` and `DEMO_API_TOKEN` as
-   above, then connect from Quests, Style or the parent area. The parent area
+   above, then connect from Talk's composer, Quests, Style or the parent area. The parent area
    should then read "Grounded answers: on · development corpus". If it reads
    "Grounded answers: off", the server was started without them.
 3. Ask on Talk. The composer's hint reads "Say hi or ask (test text only)".
@@ -394,7 +396,12 @@ infers the label from the text:
 
 Only library replies carry sources. Each one appears under the text as a title
 with its reference beneath, in plain text, because there is nothing on the
-phone to open. A reply of any other type that carries sources is refused,
+phone to open. A reference the app recognises reads as a child would say it,
+in the reply's direction: `quran:7:19-23` as `7:19–23`, a span
+`quran:12:87–quran:12:93` as `12:87–93` (with the surah's name when the
+title gives it), `bukhari:6324` as "البخاري 6324" in an Arabic reply and
+"Bukhari 6324" in an English one; any other reference is shown as sent
+(`lib/ui/source_reference.dart`). A reply of any other type that carries sources is refused,
 including chat. Chat has no label because a label says where a reply came
 from, and chat claims to come from nowhere; left bare, it cannot be mistaken
 for a library reply, which is always named and sourced. The labels stay calm,

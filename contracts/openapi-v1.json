@@ -10,8 +10,11 @@
             "type": "string"
           },
           "contentStatus": {
-            "const": "awaiting_review",
             "default": "awaiting_review",
+            "enum": [
+              "awaiting_review",
+              "unreviewed_drafts"
+            ],
             "title": "Contentstatus",
             "type": "string"
           },
