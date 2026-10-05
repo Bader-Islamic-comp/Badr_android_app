@@ -65,6 +65,19 @@ void main() {
           '$_work · 7:23 \u2013 البخاري 6324');
     });
 
+    test('runs of different kinds read in order, each whole', () {
+      // A hadith and three surahs (comp-server source_label, 2026-10-05).
+      expect(_plain('$_work · abu_dawud:5082; quran:112:1-4–quran:114:1-6'),
+          '$_work · أبو داود 5082، 112:1–114:6');
+      expect(
+          _plain('Package · abu_dawud:5082; quran:112:1-4–quran:114:1-6',
+              arabic: false),
+          'Package · Abu Dawud 5082, 112:1–114:6');
+      expect(_plain('$_work · bukhari:757; dorar_fiqh:234'),
+          '$_work · البخاري 757، الموسوعة الفقهية 234');
+      expect(_plain('$_work · bukhari:757; draft:1'), isNull);
+    });
+
     test('anything else is left as the service sent it', () {
       expect(_plain('Robert\u2019s guide · part 1'), isNull);
       expect(_plain('Placeholder draft · draft:1'), isNull);

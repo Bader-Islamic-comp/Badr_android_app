@@ -6,6 +6,17 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-10-05 (day2/competition-goals)
+
+### Fixed
+
+- **A source citing several kinds of reference named only its first and last.** The three morning and evening
+  surahs read "أبو داود 5082 – 114:1–6", leaving out 112 and 113. The server now sends runs of one kind joined
+  by `; ` (`abu_dawud:5082; quran:112:1-4–quran:114:1-6`, comp-server `source_label`), and the app reads each
+  run in order, joined by «،» in Arabic and "," in English: "أبو داود 5082، 112:1–114:6"
+  (`lib/ui/source_reference.dart`). A reference with a run the app does not know is still shown as sent.
+  147 tests pass.
+
 ## Unreleased — 2026-10-04 (test/corpus-tasks)
 
 Fixes for what the emulator showed against the server's corpus preview.

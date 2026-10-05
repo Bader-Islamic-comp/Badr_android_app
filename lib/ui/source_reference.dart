@@ -5,7 +5,9 @@ import 'text_direction.dart';
 /// The service sends a reference as the work, a middle dot and a span of
 /// machine references: `حزمة بدر العربية للمسابقة · quran:7:19-23`,
 /// `Tanzil Quran Text (Uthmani) · quran:12:87–quran:12:93`,
-/// `… · bukhari:6324`. The span is rewritten for reading — `7:19–23`,
+/// `… · bukhari:6324`, or runs of different kinds joined by `; `
+/// (`… · abu_dawud:5082; quran:112:1-4–quran:114:1-6`, read
+/// `أبو داود 5082، 112:1–114:6`). The span is rewritten for reading — `7:19–23`,
 /// `سورة يوسف 12:87–93` when the source's title already names the surah,
 /// `البخاري 6324` in an Arabic reply and `Bukhari 6324` in an English one —
 /// and the work is kept as sent. [ReplySource.reference] keeps the raw text.
@@ -74,8 +76,26 @@ class SourceReference {
     'dorar_fiqh': ('الموسوعة الفقهية', 'Fiqh encyclopedia'),
   };
 
-  /// A span of one reference or two joined by an en dash, or null.
+  /// Runs of references of different kinds, as the service joins them:
+  /// `abu_dawud:5082; quran:112:1-4–quran:114:1-6` for a hadith and three
+  /// surahs.
+  static const _runs = '; ';
+
+  /// The readable span: each run in order, joined by a comma in the reply's
+  /// language; null when any run is not one this app knows.
   static String? _readable(String span,
+      {required String title, required bool arabic}) {
+    final runs = span.split(_runs);
+    if (runs.length == 1) return _run(span, title: title, arabic: arabic);
+    final read = [
+      for (final run in runs) _run(run.trim(), title: title, arabic: arabic)
+    ];
+    if (read.any((run) => run == null)) return null;
+    return read.join(arabic ? '، ' : ', ');
+  }
+
+  /// A run of one reference or two joined by an en dash, or null.
+  static String? _run(String span,
       {required String title, required bool arabic}) {
     final parts = span.split(_dash);
     if (parts.length > 2) return null;
@@ -112,7 +132,7 @@ class SourceReference {
 
   static String _one(RegExpMatch ref,
           {required String title, required bool arabic}) =>
-      _readable(ref[0]!, title: title, arabic: arabic)!;
+      _run(ref[0]!, title: title, arabic: arabic)!;
 
   /// The surah's name as [title] gives it next to this surah's number, as in
   /// `سورة يوسف 12:85–98`, or null.
