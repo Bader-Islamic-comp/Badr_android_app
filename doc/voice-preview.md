@@ -85,8 +85,8 @@ Robert's voice, a dhikr, a feedback line or a recorded dua
 | Service switches | off | `features.speech` in the bootstrap: `preview`, then `recitation`, `voiceQuestions` and `robertVoice`. A feature shows only while `preview` is on. |
 | Parent switch, "Microphone (hold to talk)" | **off** at every app start | Parent area. Shown only when the build has the preview and the service has it on. It is not saved. Every recording needs it; listening does not. |
 | Recording | off | Hold the microphone button. A red dot and "Listening… 3 s" show while it is held. It stops on release, at `maxRecordingSeconds` (15 from the service, never over 30), at 1 MB, when the page closes and when the app leaves the screen. |
-| Microphone permission | not asked | Asked by Android the first time the button is held with the parent switch on. A refusal records nothing, says so, and typing still works. |
-| Listen | — | Needs no switch. Stop ends it, as do a new question, clearing the reply, leaving Talk and leaving the app. |
+| Microphone permission | not asked | Asked by Android the first time the button is held with the parent switch on. Android's prompt takes the touch and leaves the app inactive, so the press waits for the answer. A refusal records nothing, says so, and typing still works. After a yes the app says "The microphone is ready. Now hold to talk." (in English and Arabic), and the next hold records. |
+| Listen | — | Needs no switch. Stop ends it, as do a new question, clearing the reply, leaving Talk and leaving the app. If the phone pauses it without a word (another app takes the sound), it ends soon after its audio would have. |
 
 ## On each page
 
@@ -109,9 +109,11 @@ Robert's voice, a dhikr, a feedback line or a recorded dua
   recorded voice is coming". Duas the service has split into parts can be
   practised part by part. Quranic duas show no text here.
 - **Quests → Dhikr game.** Pick a dhikr, hear Robert say it, hold the
-  microphone and say it. The round shows "Try 1 of 3". A finished round shows
-  "+1 star", and the balance is read again from the server. "See looks in
-  Style" opens the Style tab. When the day's game stars are all given, the
+  microphone and say it. The round shows "Try 1 of 3". While a try is being
+  sent, "Choose another dhikr" waits for its answer, and an answer only ever
+  applies to the round it was sent to. A finished round shows "+1 star" and
+  the balance the server sent with it, and the progress is read again from
+  the server. "See looks in Style" opens the Style tab. When the day's game stars are all given, the
   game says "The game's stars for today are all collected. You can keep
   playing just for practice."
 
@@ -148,9 +150,11 @@ voice gets a fresh key each time; the backend is idempotent by turn.
 | `POST` and `GET /v1/turns/{turnId}/speech` | Robert's voice: ask, then read its state |
 | `GET /v1/turns/{turnId}/speech/parts/{index}` | one part, audio/wav |
 
-Uploads and audio reads wait up to 30 s; JSON reads 12 s, as before. Every
-payload is parsed strictly (`lib/domain/speech_models.dart`), and a payload
-that breaks a rule is refused whole.
+Uploads wait up to 75 s, for the backend's worst case (its own reads, speech
+recognition, retries while the speech service is busy, and a model swap after
+Robert's voice was made). Audio reads wait 40 s; JSON reads 12 s, as before.
+Every payload is parsed strictly (`lib/domain/speech_models.dart`), and a
+payload that breaks a rule is refused whole.
 
 How the backend's answers are read:
 
@@ -163,8 +167,11 @@ How the backend's answers are read:
 - `request_in_progress` (409) can only follow a lost answer, since the app
   sends one request at a time. Each dhikr has its own key for starting a
   round, so another dhikr never reuses one.
-- `round_complete` (409) and `round_not_found` (404) end the round on screen
-  and offer a new one.
+- `round_complete` (409) means a try whose answer was lost finished the
+  round. The round is shown finished ("Your last try finished this round.
+  Well done for practising!") and the balance is read again; whether it
+  gave a star shows only in that balance.
+- `round_not_found` (404) ends the round on screen and offers a new one.
 - For Robert's voice, a part the backend dropped leaves the list, so indices
   can have gaps: the app plays the listed parts in order and waits for the
   next listed one. A part that answers `audio_not_found` is skipped. An
@@ -206,6 +213,9 @@ How the backend's answers are read:
   - a game round to its star and the balance read again, the daily cap, and
     a round key kept per dhikr;
   - the composer at 320×380 with text at 2×.
+- `test/audio_playback_test.dart`: the player over a fake plugin, including a
+  play the phone paused without a word (another app took the audio focus),
+  which ends soon after its audio's own length.
 - `test/voice_copy_test.dart`: the banned words and verdict words.
 - Not yet run on a phone or the emulator, and no APK was built for this
   change. The merged manifest is still to be checked after a build.
@@ -217,9 +227,9 @@ How the backend's answers are read:
 - `contracts/openapi-v1.json` is to be synced from the backend's
   regenerated contract. The app was written against the agreed spec and
   checked against the backend's contract for the shapes above.
-- An upload waits 30 s, and the backend's own speech timeout is also 30 s, with
-  retries when the service is busy. A slow answer can reach the app as
-  "Connection unavailable" rather than the gentle busy line.
+- An upload waits 75 s, past the backend's worst case. An answer slower still
+  reads "Connection unavailable"; if that try finished a game round, the next
+  try's `round_complete` shows the round finished.
 - The parent switch should be saved with the other guardian settings once
   those exist.
 - The DPIA (G04), a retention owner and the release gate's voice items, before

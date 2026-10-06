@@ -31,19 +31,20 @@ Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
   - Hold-to-talk only, with a red dot and "Listening… 3 s". PCM16, mono, 16 kHz, streamed into memory; the WAV
     header is built in Dart. At most 15 s (the backend's `maxRecordingSeconds`, never over 30) and 1 MB. It
     stops on release, when the page closes and when the app leaves the screen, and the bytes are cleared after
-    the request.
+    the request. Android's permission prompt is waited out: a refusal says so, and after a yes the app says "The
+    microphone is ready. Now hold to talk."
   - Playback from bytes in memory. On iOS, macOS and Linux the player plugin would write a temporary file, so
     there the app does not play.
   - Behind small interfaces (`VoiceRecorder`, `AudioPlayback`) with fakes for the tests.
 - **Controls.** `--dart-define=VOICE=false` builds without any of it. The backend's `features.speech` switches
   each part. The parent area's "Microphone (hold to talk)" is off at every start, is not saved, and is needed
   for every recording; listening needs no switch.
-- **Requests** (`lib/data/demo_api.dart`): raw `audio/wav` uploads (30 s timeout, 1 MB bound, keys for writes and
-  none for a transcription), WAV downloads checked for their header, and strict parsing of every new payload
-  (`lib/domain/speech_models.dart`). The backend's speech error codes get gentle wording; any other error stays
-  generic.
-- **Tests.** 64 new tests: the WAV header, every new payload, the requests, each page with a fake microphone,
-  player and service, and a scan of every preview string for banned and verdict words. 247 tests pass and
+- **Requests** (`lib/data/demo_api.dart`): raw `audio/wav` uploads (75 s timeout for the backend's worst case, 1 MB
+  bound, keys for writes and none for a transcription), WAV downloads (40 s timeout) checked for their header, and
+  strict parsing of every new payload (`lib/domain/speech_models.dart`). The backend's speech error codes get gentle
+  wording; any other error stays generic.
+- **Tests.** 90 new tests: the WAV header, every new payload, the requests, each page with a fake microphone,
+  player and service, and a scan of every preview string for banned and verdict words. 273 tests pass and
   `flutter analyze` is clean. Nothing was built for Android or run on a device: there is no Android SDK in
   this environment.
 

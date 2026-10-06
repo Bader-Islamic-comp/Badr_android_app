@@ -197,7 +197,7 @@ Unity.
 
 ## Prepare and run
 
-Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 247 tests
+Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 273 tests
 pass. Dependency versions are recorded in `pubspec.lock`. Besides `http` and
 `uuid`, the app uses `camera` 0.12.1 and `tflite_flutter` 0.12.1 for the
 movement helper, and `record` 7.1.1 and `audioplayers` 6.8.1 for the voice
@@ -489,7 +489,7 @@ microphone button, no parent switch and no microphone request.
 
 ## Verification coverage and remaining work
 
-The suite (247 tests) covers no-network default mode, server-owned rewards,
+The suite (273 tests) covers no-network default mode, server-owned rewards,
 ownership rejection, idempotent completion headers, resuming known question
 turns, the bootstrap's grounded-answers flag, polling a pending turn to its
 deadline and resuming it, every turn-contract rule, clearing and disposal
