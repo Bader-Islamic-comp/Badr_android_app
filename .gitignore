@@ -24,3 +24,4 @@ ios/Flutter/flutter_export_environment.sh
 # 6 MB Figma source; design/ui-reference.png is the tracked layout reference.
 archive/
 design/ui.make
+*.apk
