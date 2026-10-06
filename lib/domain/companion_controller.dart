@@ -200,6 +200,15 @@ class CompanionController extends ChangeNotifier {
         challenges.any((challenge) => challenge.completed);
   }
 
+  /// Shows a balance the service sent with another answer, as the dhikr game
+  /// does with a finished round. It is the service's number, taken as it came:
+  /// nothing is added or counted here. Ignored while nothing is connected.
+  void showServiceBalance(int value) {
+    if (_disposed || !connected || value < 0) return;
+    balance = value;
+    _changed();
+  }
+
   /// Re-reads the service's progress, as after the dhikr game gave a star.
   /// The balance is always the service's, never adjusted here.
   Future<void> refreshProgress() => _operate(() async {

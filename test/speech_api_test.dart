@@ -298,6 +298,41 @@ void main() {
               }),
           throwsA(isA<DemoApiException>()));
     });
+
+    test('a round may have any number of tries; three of them count', () {
+      // Tries that do not count still add up on the service, with no limit.
+      final long = DhikrRound.fromJson(round(attempts: 150, counted: 2));
+      expect(long.attempts, 150);
+      expect(long.countedAttempts, 2);
+      expect(
+          DhikrRound.fromJson(round(attempts: DhikrRound.maxAttempts)).attempts,
+          DhikrRound.maxAttempts);
+      for (final bad in [
+        round(attempts: DhikrRound.maxAttempts + 1),
+        round(attempts: -1),
+        round(attempts: 150, counted: 4),
+      ]) {
+        expect(
+            () => DhikrRound.fromJson(bad), throwsA(isA<DemoApiException>()));
+      }
+    });
+
+    test('a scored try can be unsure with its words shown, as sent', () {
+      // The service decides the outcome; the app never works it out from the
+      // words.
+      final result = PracticeResult.fromJson(practiceResult(
+          outcome: 'unsure',
+          words: [
+            {'index': 0, 'state': 'clear'},
+            {'index': 1, 'state': 'unsure'},
+          ],
+          text: 'لنحاول مرة أخرى معًا.'));
+      expect(result.outcome, PracticeOutcome.unsure);
+      expect(result.showWords, isTrue);
+      expect(result.words.map((word) => word.state),
+          [PracticeOutcome.clear, PracticeOutcome.unsure]);
+      expect(result.feedback.text, 'لنحاول مرة أخرى معًا.');
+    });
   });
 
   group('voice', () {

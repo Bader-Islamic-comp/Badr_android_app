@@ -1109,5 +1109,292 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       model.dispose();
     });
+
+    /// Both adhkar, as the game lists them.
+    Map<String, Object?> bothAdhkar() => {
+          ...game(),
+          'items': [
+            for (final item in adhkarItems)
+              {...item}..remove('transliteration'),
+          ],
+        };
+
+    Future<void> openGame(WidgetTester tester) async {
+      await _microphoneOn(tester, tab: 'Quests');
+      await tester.ensureVisible(find.text('Play the dhikr game'));
+      await tester.tap(find.text('Play the dhikr game'));
+      await tester.pumpAndSettle();
+    }
+
+    final choose = find.widgetWithText(TextButton, 'Choose another dhikr');
+
+    testWidgets(
+        'a try’s answer stays with its round: choosing another dhikr waits '
+        'until it is in', (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      final tried = <String>[];
+      final takbeerAnswer = Completer<http.Response>();
+      final model = _connected((request) async {
+        final path = request.url.path;
+        if (path == '/v1/games/dhikr') return jsonResponse(bothAdhkar());
+        if (path == '/v1/games/dhikr/rounds') {
+          final dhikr = (jsonDecode(request.body) as Map)['dhikrId'] as String;
+          return jsonResponse(round(
+              roundId: dhikr == 'takbeer' ? 'round-1' : 'round-2',
+              dhikrId: dhikr));
+        }
+        if (path.endsWith('/attempts')) {
+          tried.add(path);
+          if (path == '/v1/games/dhikr/rounds/round-1/attempts') {
+            return takbeerAnswer.future;
+          }
+          return jsonResponse({
+            'attempt': practiceResult(text: 'تسبيح'),
+            'round': round(
+                roundId: 'round-2',
+                dhikrId: 'tasbeeh',
+                attempts: 1,
+                counted: 1),
+            'balance': 5,
+          });
+        }
+        return http.Response('{}', 404);
+      });
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(recorder: recorder)));
+      await tester.pumpAndSettle();
+      await openGame(tester);
+      await tester.tap(find.text('Play with Takbeer'));
+      await _flush(tester);
+
+      await _say(tester, recorder, _mic);
+      expect(find.text(PracticePanel.sendingCopy), findsOneWidget);
+      expect(tester.widget<TextButton>(choose).onPressed, isNull,
+          reason: 'the try belongs to this round');
+      await tester.tap(choose, warnIfMissed: false);
+      await _flush(tester);
+      expect(find.text('Try 1 of 3'), findsOneWidget);
+      expect(find.text('Play with Tasbeeh'), findsNothing);
+
+      takbeerAnswer.complete(jsonResponse({
+        'attempt': practiceResult(text: 'تكبير'),
+        'round': round(attempts: 1, counted: 1),
+        'balance': 5,
+      }));
+      await _flush(tester);
+      expect(find.text('Try 2 of 3'), findsOneWidget);
+      expect(tester.widget<TextButton>(choose).onPressed, isNotNull);
+
+      await tester.tap(choose);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Play with Tasbeeh'));
+      await tester.tap(find.text('Play with Tasbeeh'));
+      await _flush(tester);
+      expect(find.text('Tasbeeh · التسبيح'), findsOneWidget);
+      expect(find.text('Try 1 of 3'), findsOneWidget);
+      await _say(tester, recorder, _mic);
+      expect(tried, [
+        '/v1/games/dhikr/rounds/round-1/attempts',
+        '/v1/games/dhikr/rounds/round-2/attempts',
+      ]);
+      expect(find.text('Try 2 of 3'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets(
+        'a round that starts after the child chose another dhikr is left, '
+        'and Robert does not say it', (tester) async {
+      _phone(tester);
+      final playback = FakePlayback();
+      final started = Completer<http.Response>();
+      final model = _connected((request) async => switch (request.url.path) {
+            '/v1/games/dhikr' => jsonResponse(bothAdhkar()),
+            '/v1/games/dhikr/rounds' => started.future,
+            '/v1/audio/adhkar/takbeer' => wavResponse(50),
+            _ => http.Response('{}', 404),
+          });
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(playback: playback)));
+      await tester.pumpAndSettle();
+      await openGame(tester);
+      await tester.tap(find.text('Play with Takbeer'));
+      await _flush(tester);
+      await tester.tap(choose);
+      await _flush(tester);
+      expect(find.text(DhikrGamePage.intro), findsOneWidget);
+
+      started.complete(jsonResponse(round()));
+      await _flush(tester);
+      expect(playback.played, isEmpty);
+      expect(find.text(DhikrGamePage.intro), findsOneWidget);
+      expect(find.text('Try 1 of 3'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets(
+        'a round the service already finished is shown finished, and the '
+        'balance is read again', (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      var rewardReads = 0;
+      final model = _connected((request) async {
+        if (request.url.path == '/v1/rewards') rewardReads++;
+        final progress = _progress(request, 6);
+        if (progress != null) return progress;
+        return switch (request.url.path) {
+          '/v1/games/dhikr' => jsonResponse(game()),
+          '/v1/games/dhikr/rounds' => jsonResponse(round()),
+          '/v1/games/dhikr/rounds/round-1/attempts' =>
+            errorResponse(409, 'round_complete'),
+          _ => http.Response('{}', 404),
+        };
+      });
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(recorder: recorder)));
+      await tester.pumpAndSettle();
+      await openGame(tester);
+      await tester.tap(find.text('Play with Takbeer'));
+      await _flush(tester);
+      await _say(tester, recorder, _mic);
+      await tester.pumpAndSettle();
+
+      expect(find.text(DhikrGamePage.finishedEarlier), findsOneWidget);
+      expect(rewardReads, 1, reason: 'its star, if any, is the service’s');
+      expect(find.text('You have 6 learning stars.'), findsOneWidget);
+      expect(find.text(DhikrGamePage.starEarned), findsNothing,
+          reason: 'whether this round gave one is not known here');
+      expect(find.text('Play again'), findsOneWidget);
+      expect(_mic, findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets('a round the service no longer knows offers a new one',
+        (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      var rounds = 0;
+      final model = _connected((request) async {
+        switch (request.url.path) {
+          case '/v1/games/dhikr':
+            return jsonResponse(game());
+          case '/v1/games/dhikr/rounds':
+            rounds++;
+            return jsonResponse(round(roundId: 'round-$rounds'));
+          case '/v1/games/dhikr/rounds/round-1/attempts':
+            return errorResponse(404, 'round_not_found');
+        }
+        return http.Response('{}', 404);
+      });
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(recorder: recorder)));
+      await tester.pumpAndSettle();
+      await openGame(tester);
+      await tester.tap(find.text('Play with Takbeer'));
+      await _flush(tester);
+      await _say(tester, recorder, _mic);
+      expect(
+          find.text(DemoApi.knownErrors['round_not_found']!), findsOneWidget);
+      expect(_mic, findsNothing);
+      await tester.tap(find.text('Start a new round'));
+      await _flush(tester);
+      expect(rounds, 2);
+      expect(find.text('Try 1 of 3'), findsOneWidget);
+      expect(_mic, findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets(
+        'a star’s balance is the service’s own number when the progress '
+        'cannot be read again now', (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      var rewardReads = 0;
+      final model = _connected((request) async {
+        if (request.url.path == '/v1/rewards') rewardReads++;
+        return switch (request.url.path) {
+          '/v1/games/dhikr' => jsonResponse(game()),
+          '/v1/games/dhikr/rounds' => jsonResponse(round()),
+          '/v1/games/dhikr/rounds/round-1/attempts' => jsonResponse({
+              'attempt': practiceResult(outcome: 'clear', text: 'أحسنت!'),
+              'round': round(
+                  attempts: 1, counted: 1, complete: true, starAwarded: true),
+              'balance': 6,
+            }),
+          _ => http.Response('{}', 404),
+        };
+      });
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(recorder: recorder)));
+      await tester.pumpAndSettle();
+      await openGame(tester);
+      await tester.tap(find.text('Play with Takbeer'));
+      await _flush(tester);
+      // Another operation holds the controller, so a refresh does nothing.
+      model.busy = true;
+      await _say(tester, recorder, _mic);
+      await tester.pumpAndSettle();
+      expect(find.text(DhikrGamePage.starEarned), findsOneWidget);
+      expect(rewardReads, 0);
+      expect(find.text('You have 6 learning stars.'), findsOneWidget);
+      expect(
+          find.descendant(of: find.byType(StarChip), matching: find.text('6')),
+          findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets(
+        'leaving mid-try drops the late answer, and its star is read again '
+        'from the service', (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      final answer = Completer<http.Response>();
+      var rewardReads = 0;
+      final model = _connected((request) async {
+        if (request.url.path == '/v1/rewards') rewardReads++;
+        final progress = _progress(request, 6);
+        if (progress != null) return progress;
+        return switch (request.url.path) {
+          '/v1/games/dhikr' => jsonResponse(game()),
+          '/v1/games/dhikr/rounds' => jsonResponse(round()),
+          '/v1/games/dhikr/rounds/round-1/attempts' => answer.future,
+          _ => http.Response('{}', 404),
+        };
+      });
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(recorder: recorder)));
+      await tester.pumpAndSettle();
+      await openGame(tester);
+      await tester.tap(find.text('Play with Takbeer'));
+      await _flush(tester);
+      await _say(tester, recorder, _mic);
+      expect(find.text(PracticePanel.sendingCopy), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(DhikrGamePage), findsNothing);
+      answer.complete(jsonResponse({
+        'attempt': practiceResult(outcome: 'clear'),
+        'round':
+            round(attempts: 1, counted: 1, complete: true, starAwarded: true),
+        'balance': 6,
+      }));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(rewardReads, 1);
+      expect(
+          find.descendant(of: find.byType(StarChip), matching: find.text('6')),
+          findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
   });
 }

@@ -276,7 +276,8 @@ class DuaList {
 
 /// How one practice attempt went, as the service decided it. Practice, never
 /// a verdict: `clear`, `tryAgain` (some words to practise) or `unsure` (the
-/// service could not tell, so it says nothing about the words).
+/// service could not tell). The app never works the outcome out from the
+/// words: a scored attempt can be `unsure` with its words still shown.
 enum PracticeOutcome {
   clear('clear'),
   tryAgain('try_again'),
@@ -398,9 +399,14 @@ class DhikrRound {
 
   static const tries = 3;
 
+  /// The service counts every try it was sent, including the ones that do
+  /// not count towards the round, with no limit of its own. This bound only
+  /// keeps the number sane.
+  static const maxAttempts = 1000000;
+
   factory DhikrRound.fromJson(dynamic value) {
     final json = _map(value);
-    final attempts = _int(json['attempts'], 0, 100);
+    final attempts = _int(json['attempts'], 0, maxAttempts);
     final counted = _int(json['countedAttempts'], 0, tries);
     final complete = _bool(json['complete']);
     final starAwarded = _bool(json['starAwarded']);

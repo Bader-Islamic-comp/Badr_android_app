@@ -44,6 +44,11 @@ class DhikrGamePage extends StatefulWidget {
   static const wellDone = 'Well done for practising!';
   static const starEarned = '+1 star · +1 نجمة';
 
+  /// The service says the round is already finished: a try whose answer did
+  /// not reach the app (a lost connection) finished it.
+  static const finishedEarlier = 'Your last try finished this round. Well '
+      'done for practising!';
+
   @override
   State<DhikrGamePage> createState() => _DhikrGamePageState();
 }
@@ -60,6 +65,10 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
   DhikrRound? round;
   bool starting = false;
 
+  /// A try is with the service. The round stays as it is until its answer
+  /// is in: choosing another dhikr waits.
+  bool sending = false;
+
   /// One key per dhikr whose round is being started, so a retry after a lost
   /// answer finds the same round rather than making a second one, and
   /// another dhikr never reuses a key with a different request.
@@ -67,6 +76,11 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
 
   /// The attempt that finished the round, for its feedback line.
   PracticeResult? lastAttempt;
+
+  /// The service reported the round as already finished, by a try whose
+  /// answer never reached the app. Whether it gave a star is not known here;
+  /// the balance read again from the service shows it.
+  bool finishedEarlier = false;
 
   @override
   void initState() {
@@ -97,10 +111,12 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
 
   Future<void> _start(Dhikr dhikr) async {
     await player.stop();
+    if (!mounted) return;
     setState(() {
       chosen = dhikr;
       round = null;
       lastAttempt = null;
+      finishedEarlier = false;
       starting = true;
       problem = null;
     });
@@ -108,7 +124,9 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
       final key = roundKeys[dhikr.id] ??= DemoApi.newKey();
       final started = await api.startDhikrRound(dhikr.id, key);
       roundKeys.remove(dhikr.id);
-      if (!mounted) return;
+      // The child chose another dhikr while this one was starting: the round
+      // is left unplayed, and Robert does not say a dhikr no longer shown.
+      if (!mounted || chosen?.id != dhikr.id) return;
       setState(() => round = started);
       // Robert says it first, so the child hears it before trying.
       if (dhikr.audio) {
@@ -116,7 +134,9 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
             player.play('dhikr:${dhikr.id}', () => api.dhikrAudio(dhikr.id)));
       }
     } on DemoApiException catch (error) {
-      if (mounted) setState(() => problem = error.message);
+      if (mounted && chosen?.id == dhikr.id) {
+        setState(() => problem = error.message);
+      }
     } finally {
       if (mounted) setState(() => starting = false);
     }
@@ -124,34 +144,74 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
 
   Future<PracticeResult> _attempt(Uint8List wav) async {
     final current = round!;
+    final dhikr = chosen!;
+    // Only the round this try was sent to takes its answer. A late answer for
+    // a round the child has left is never shown on another one.
+    bool stillHere() =>
+        mounted &&
+        chosen?.id == dhikr.id &&
+        round?.roundId == current.roundId &&
+        !round!.complete;
+    setState(() => sending = true);
     try {
       final result =
           await api.dhikrAttempt(current.roundId, wav, DemoApi.newKey());
-      if (!mounted) return result.attempt;
+      if (!stillHere()) {
+        // Left mid-try: the star chip elsewhere is read again from the
+        // service, never counted here.
+        if (result.round.starAwarded) {
+          unawaited(widget.model.refreshProgress());
+        }
+        return result.attempt;
+      }
       setState(() {
         round = result.round;
         if (result.round.complete) lastAttempt = result.attempt;
       });
-      if (result.round.complete) unawaited(_finished());
+      if (result.round.complete) {
+        // The service's own balance after the round, shown even when a
+        // refresh cannot run now; the refresh then reads the rest.
+        widget.model.showServiceBalance(result.balance);
+        unawaited(_finished(refresh: result.round.starAwarded));
+      }
       return result.attempt;
     } on DemoApiException catch (error) {
-      // The service has no open round to add this to: say so, and offer a
-      // new one.
-      if (mounted &&
-          (error.code == 'round_not_found' || error.code == 'round_complete')) {
-        setState(() {
-          round = null;
-          problem = error.message;
-        });
+      if (stillHere()) {
+        if (error.code == 'round_complete') {
+          // A try whose answer was lost finished the round on the service.
+          // It is shown finished, and the balance is read again for its star.
+          setState(() {
+            round = DhikrRound(
+                roundId: current.roundId,
+                dhikrId: current.dhikrId,
+                attempts: current.attempts,
+                countedAttempts: current.countedAttempts,
+                complete: true,
+                starAwarded: false);
+            lastAttempt = null;
+            finishedEarlier = true;
+          });
+          unawaited(_finished(refresh: true));
+        } else if (error.code == 'round_not_found') {
+          // The service has no open round to add this to: say so, and offer
+          // a new one.
+          setState(() {
+            round = null;
+            problem = error.message;
+          });
+        }
       }
       rethrow;
+    } finally {
+      if (mounted) setState(() => sending = false);
     }
   }
 
-  /// A round finished: the balance is read again from the service, and the
-  /// game's own count of today's stars with it.
-  Future<void> _finished() async {
-    if (round?.starAwarded ?? false) await widget.model.refreshProgress();
+  /// A round finished: the balance is read again from the service when
+  /// [refresh] says it may have changed, and the game's own count of today's
+  /// stars with it.
+  Future<void> _finished({required bool refresh}) async {
+    if (refresh) await widget.model.refreshProgress();
     try {
       final loaded = await api.dhikrGame();
       if (mounted) setState(() => game = loaded);
@@ -166,6 +226,7 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
       chosen = null;
       round = null;
       lastAttempt = null;
+      finishedEarlier = false;
       problem = null;
     });
   }
@@ -275,7 +336,10 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
         ]),
       ),
       const SizedBox(height: 12),
-      TextButton(onPressed: _choose, child: const Text('Choose another dhikr')),
+      // Not while a try is with the service: its answer belongs to this round.
+      TextButton(
+          onPressed: sending ? null : _choose,
+          child: const Text('Choose another dhikr')),
     ];
   }
 
@@ -305,23 +369,28 @@ class _DhikrGamePageState extends State<DhikrGamePage> {
 
   Widget _complete(BuildContext context, DhikrRound round) {
     final last = lastAttempt;
+    final balance = ListenableBuilder(
+      listenable: widget.model,
+      builder: (context, _) => widget.model.balance == null
+          ? const SizedBox.shrink()
+          : Text('You have ${widget.model.balance} learning stars.',
+              style: const TextStyle(color: muted)),
+    );
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (last != null) ...[
         FeedbackLine(result: last, player: player, audio: api.feedbackAudio),
         const SizedBox(height: 16),
       ],
-      if (round.starAwarded) ...[
+      if (finishedEarlier) ...[
+        const Text(DhikrGamePage.finishedEarlier,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        balance,
+      ] else if (round.starAwarded) ...[
         _Celebration(reduceMotion: MediaQuery.disableAnimationsOf(context)),
         const SizedBox(height: 8),
         const Text(DhikrGamePage.wellDone,
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-        ListenableBuilder(
-          listenable: widget.model,
-          builder: (context, _) => widget.model.balance == null
-              ? const SizedBox.shrink()
-              : Text('You have ${widget.model.balance} learning stars.',
-                  style: const TextStyle(color: muted)),
-        ),
+        balance,
       ] else
         const Text(DhikrGamePage.lovelyPractice,
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
