@@ -6,6 +6,32 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-10-06 (reviewer connection and web preview)
+
+### Added
+
+- **A Development service form in the parent area** for adult reviewers: a server address and an operator
+  token, such as the ones `Badr_backend/deploy/start-demo.*` prints. Shown only while not connected and not on
+  the web. The token is held in memory only. `CompanionController.connectTo` refuses a config that fails
+  `DemoConfig.enabled` before any request.
+- **GitHub Pages web preview** (`.github/workflows/pages.yml`): analyze, test, then build web with
+  `POSTURE_HELPER=false`, `VOICE=false` and self-hosted CanvasKit on every push to `main`.
+- `doc/reviewer-release.md`: how the APK is published as a release asset, the notes template, and which APK can
+  connect.
+
+### Changed
+
+- Plain `http` is accepted only for `localhost` and IPv4 loopback/private ranges; other hosts need `https`.
+- The release manifest declares `INTERNET`, and one network security config (main) permits cleartext so the
+  Dart rule decides. The debug-only loopback config is removed. Set it back to `false` with HTTPS before any
+  child-facing release.
+
+### Verified
+
+- `flutter analyze` clean; `flutter test` 279 passed (6 new) on Flutter 3.47.6, Linux.
+- The web release build renders in headless Chromium under `/Badr_android_app/` with no third-party requests.
+- Not verified: an APK with this change (the Unity export is not in this checkout), any device.
+
 ## Unreleased — 2026-10-06 (voice preview)
 
 ### Added
