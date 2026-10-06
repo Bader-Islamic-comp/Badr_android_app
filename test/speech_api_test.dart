@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -436,6 +437,46 @@ void main() {
       expect(sent.headers['Content-Type'], 'audio/wav');
       expect(() => api.transcribe(markedWav(1), language: 'fr'),
           throwsArgumentError);
+      api.close();
+    });
+
+    // A widget test only for its fake clock: no real time passes.
+    testWidgets(
+        'an upload waits 75 s for the backend’s worst case, an audio read '
+        '40 s and a JSON read 12 s', (tester) async {
+      final api = DemoApi(config,
+          client: MockClient((_) => Completer<http.Response>().future));
+      const lost = 'Connection unavailable. Please try again.';
+      String? upload, audio, json;
+      String said(Object error) =>
+          error is DemoApiException ? error.message : '$error';
+      unawaited(api
+          .practise(
+              itemId: 'takbeer',
+              segment: 0,
+              attempt: 1,
+              wav: markedWav(1),
+              key: 'k')
+          .then((_) => upload = 'answered',
+              onError: (Object error) => upload = said(error)));
+      unawaited(api.dhikrAudio('takbeer').then((_) => audio = 'answered',
+          onError: (Object error) => audio = said(error)));
+      unawaited(api.adhkar().then((_) => json = 'answered',
+          onError: (Object error) => json = said(error)));
+
+      await tester.pump(const Duration(seconds: 11));
+      expect(json, isNull);
+      await tester.pump(const Duration(seconds: 2));
+      expect(json, lost);
+      await tester.pump(const Duration(seconds: 26)); // 39 s
+      expect(audio, isNull);
+      expect(upload, isNull);
+      await tester.pump(const Duration(seconds: 2)); // 41 s
+      expect(audio, lost);
+      await tester.pump(const Duration(seconds: 33)); // 74 s
+      expect(upload, isNull, reason: 'the service may still be working on it');
+      await tester.pump(const Duration(seconds: 2)); // 76 s
+      expect(upload, lost);
       api.close();
     });
 

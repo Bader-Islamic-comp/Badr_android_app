@@ -59,9 +59,14 @@ class DemoApi {
 
   static const _jsonTimeout = Duration(seconds: 12);
 
-  /// Uploads wait for speech recognition, and audio reads may wait for the
-  /// speech service.
-  static const _audioTimeout = Duration(seconds: 30);
+  /// An upload waits for the backend's worst case: its own reads, speech
+  /// recognition, retries while the speech service is busy, and a model swap
+  /// on the service after it made Robert's voice. Giving up sooner would say
+  /// "Connection unavailable" while the service may still count the try.
+  static const _uploadTimeout = Duration(seconds: 75);
+
+  /// Audio reads may wait for the speech service.
+  static const _audioTimeout = Duration(seconds: 40);
 
   static const _generic = 'The service could not finish this request.';
 
@@ -137,7 +142,7 @@ class DemoApi {
     });
     request.bodyBytes = wav;
     try {
-      return _decode(await _send(request, _audioTimeout));
+      return _decode(await _send(request, _uploadTimeout));
     } finally {
       request.bodyBytes.fillRange(0, request.bodyBytes.length, 0);
     }
