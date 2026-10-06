@@ -49,11 +49,17 @@ it. Only the scripts, the metrics and the exported model are committed.
    file matches the app's `Posture` order, that the model is bundled, and that
    the app's thresholds are the ones in `results/thresholds.json`.
 6. Check the model on a device. Its header says how to copy `check/` into the
-   app. On the Android 16 x86_64 emulator it read ON_DEVICE:
+   app. The test prints how many it read right, the time per inference, and the
+   confusion table, both by top choice and counted at the thresholds:
 
    ```bash
    flutter test integration_test/posture_model_test.dart -d emulator-5554
    ```
+
+   On the Android 16 x86_64 emulator, v1's file read 435 of 484 right (89.9%),
+   at 180 ms per inference. v2's file has not been run there yet. It is scored
+   on the 503 pictures of v2's test split, and the result goes in the model
+   card.
 
 ## Files
 
@@ -64,5 +70,5 @@ it. Only the scripts, the metrics and the exported model are committed.
 | `kaggle_none_excluded.csv` | The 31 Kaggle photos whose "none" square has a person nobody boxed, and who it is. Found by looking at every square. |
 | `train.py` | Trains MobileNetV3-Small with ImageNet weights in two stages. It exports a TensorFlow Lite model with int8 weights, scores the Keras model and the exported file on the held-out test set, and calls `calibrate.py`. |
 | `calibrate.py` | Sets each posture's confidence threshold on the validation split (the lowest from 0.6 up that reaches 90% precision) and scores the test split at those thresholds. It can also be run alone on a run folder. |
-| `results/` | `metrics.json` from the runs behind the bundled model, and `thresholds.json`, the thresholds the app ships with. |
+| `results/` | `main.json`, the metrics of the run behind the bundled model; `thresholds.json`, the thresholds the app ships with; and the two cross-dataset runs, which are still v1's. |
 | `MODEL_CARD.md` | What the model is for, what it is not for, its data, licences, results and limits. |

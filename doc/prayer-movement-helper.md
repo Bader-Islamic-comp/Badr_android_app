@@ -110,26 +110,35 @@ The drawings go to the scholarly reviewer with the step names.
 `ml/prayer_posture/MODEL_CARD.md` covers the data, licences, results and limits.
 In short:
 
-- MobileNetV3-Small, 1.1 MB, with int8 weights. It runs on TensorFlow Lite
-  (LiteRT 1.4 through `tflite_flutter`).
+- The model is `prayer-posture-v2`: MobileNetV3-Small, 1.1 MB, with int8
+  weights. It runs on TensorFlow Lite (LiteRT 1.4 through `tflite_flutter`).
 - It was trained on two public datasets of adults and older children praying.
   **The Kaggle set is CC BY-NC 4.0, so the model is for non-commercial use**
   until it is retrained without that set.
-- On 484 held-out pictures it is right 89.7% of the time. Of the empty
-  pictures, 4.3% are taken for a posture, and 1.7% of people are taken for
-  nobody. The model card has the detail.
-- Its main weakness is over-calling prostration: some people sitting, seen from
-  behind, and some bowing, read as sujud. A child sitting at the "Prostrate"
-  step can be moved on. That costs nothing: they can tap Start again, and no
-  step carries a reward.
+- For v2, 222 Kaggle photos stored sideways were turned upright, and 31 "none"
+  squares with a person in them were left out.
+- On 503 held-out pictures it is right 97.0% of the time. None of the 77 empty
+  pictures is taken for a posture. The model card has the detail, and a fair
+  comparison with v1.
+- Each posture has its own threshold, set on the validation pictures
+  (`ml/prayer_posture/results/thresholds.json`). It is the lowest bar, from 0.6
+  up, at which nine in ten of that posture's calls there are right. For v2 all
+  four are 0.6. A posture counts as seen when, in three of the last five
+  frames, it is the top choice and reaches that posture's threshold.
+- Its weakest call is still prostration: 87% of its sujud calls on the test
+  pictures are right. Most of the wrong ones are small figures in one photo of
+  a packed mosque, but a man sitting, seen from the side, can still read as
+  sujud. A child sitting at the "Prostrate" step can be moved on. That costs
+  nothing: they can tap Start again, and no step carries a reward.
 
 ## Testing
 
 - `test/posture_test.dart` covers:
   - the model input: letterbox, rotation and colour conversion;
-  - the steadying of readings;
+  - the steadying of readings, with each posture held to its own threshold;
   - the practice steps;
-  - the label order against the bundled model.
+  - the label order against the bundled model;
+  - the app's thresholds against `ml/prayer_posture/results/thresholds.json`.
 - `test/prayer_practice_test.dart` covers the page with a scripted source in
   place of the camera:
   - the camera starts only when asked;
@@ -139,16 +148,19 @@ In short:
 - `integration_test/posture_model_test.dart` runs the bundled model on a phone
   or emulator against held-out photos copied into the app's own storage. It
   checks that the Dart input and the Android runtime agree with the Python
-  scores. On the emulator it read 435 of 484 correctly (89.9%), at 180 ms per
-  inference.
-- On the Android 16 x86_64 emulator, the whole path was checked in the real app:
+  scores, and also counts the readings at the thresholds. On the emulator, v1's
+  file read 435 of 484 correctly (89.9%), at 180 ms per inference. v2's file
+  has not been run on the emulator yet.
+- On the Android 16 x86_64 emulator, the whole path was checked in the real app,
+  with v1's model:
   - the parent switch;
   - the system camera prompt;
   - the "Camera on" badge and the live preview;
   - the camera released when the page closes or the camera is turned off
     (`dumpsys media.camera` lists no active client).
   - With the emulator's empty generated scene in view for 20 s, the practice
-    stayed on its first step ("The helper is watching…").
+    stayed on its first step ("The helper is watching…"). v2 is still to be
+    checked this way.
   - The APK asks for `CAMERA` and `INTERNET` only.
 - Development testing is adult-operated, as the rest of this preview is. The
   helper has not been tried with children, and no child's picture may be
