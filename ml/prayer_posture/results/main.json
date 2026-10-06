@@ -1,0 +1,1307 @@
+{
+  "model": "prayer-posture-v1",
+  "classes": [
+    "qiyam",
+    "ruku",
+    "sujud",
+    "julus",
+    "none"
+  ],
+  "input": {
+    "shape": [
+      1,
+      224,
+      224,
+      3
+    ],
+    "range": [
+      0,
+      255
+    ],
+    "layout": "RGB, letterboxed with gray 114"
+  },
+  "output": {
+    "shape": [
+      1,
+      5
+    ],
+    "order": [
+      "qiyam",
+      "ruku",
+      "sujud",
+      "julus",
+      "none"
+    ]
+  },
+  "train_sources": [
+    "kaggle",
+    "imcspd",
+    "synthetic"
+  ],
+  "test_sources": [
+    "kaggle",
+    "imcspd",
+    "synthetic"
+  ],
+  "counts": {
+    "train": 2359,
+    "val": 343,
+    "test": 484
+  },
+  "epochs": {
+    "head": 8,
+    "tune": 19
+  },
+  "val_accuracy": 0.9271,
+  "keras": {
+    "n": 484,
+    "accuracy": 0.8843,
+    "macro_f1": 0.8847,
+    "per_class": {
+      "qiyam": {
+        "precision": 0.9189,
+        "recall": 0.9855,
+        "f1": 0.951,
+        "n": 69
+      },
+      "ruku": {
+        "precision": 0.9126,
+        "recall": 0.8319,
+        "f1": 0.8704,
+        "n": 113
+      },
+      "sujud": {
+        "precision": 0.6837,
+        "recall": 0.9571,
+        "f1": 0.7976,
+        "n": 70
+      },
+      "julus": {
+        "precision": 0.9926,
+        "recall": 0.8282,
+        "f1": 0.903,
+        "n": 163
+      },
+      "none": {
+        "precision": 0.8767,
+        "recall": 0.9275,
+        "f1": 0.9014,
+        "n": 69
+      }
+    },
+    "confusion": [
+      [
+        68,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        3,
+        94,
+        12,
+        0,
+        4
+      ],
+      [
+        0,
+        3,
+        67,
+        0,
+        0
+      ],
+      [
+        1,
+        6,
+        17,
+        135,
+        4
+      ],
+      [
+        2,
+        0,
+        2,
+        1,
+        64
+      ]
+    ],
+    "by_source": {
+      "imcspd": {
+        "n": 108,
+        "accuracy": 1.0,
+        "macro_f1": 0.8,
+        "per_class": {
+          "qiyam": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 42
+          },
+          "ruku": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 13
+          },
+          "sujud": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 10
+          },
+          "julus": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 43
+          },
+          "none": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          }
+        },
+        "confusion": [
+          [
+            42,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            13,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            10,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            43,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "kaggle": {
+        "n": 333,
+        "accuracy": 0.8318,
+        "macro_f1": 0.8236,
+        "per_class": {
+          "qiyam": {
+            "precision": 0.8125,
+            "recall": 0.963,
+            "f1": 0.8814,
+            "n": 27
+          },
+          "ruku": {
+            "precision": 0.9,
+            "recall": 0.81,
+            "f1": 0.8526,
+            "n": 100
+          },
+          "sujud": {
+            "precision": 0.6477,
+            "recall": 0.95,
+            "f1": 0.7703,
+            "n": 60
+          },
+          "julus": {
+            "precision": 0.9892,
+            "recall": 0.7667,
+            "f1": 0.8638,
+            "n": 120
+          },
+          "none": {
+            "precision": 0.7,
+            "recall": 0.8077,
+            "f1": 0.75,
+            "n": 26
+          }
+        },
+        "confusion": [
+          [
+            26,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            3,
+            81,
+            12,
+            0,
+            4
+          ],
+          [
+            0,
+            3,
+            57,
+            0,
+            0
+          ],
+          [
+            1,
+            6,
+            17,
+            92,
+            4
+          ],
+          [
+            2,
+            0,
+            2,
+            1,
+            21
+          ]
+        ]
+      },
+      "synthetic": {
+        "n": 43,
+        "accuracy": 1.0,
+        "macro_f1": 0.2,
+        "per_class": {
+          "qiyam": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          },
+          "ruku": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          },
+          "sujud": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          },
+          "julus": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          },
+          "none": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 43
+          }
+        },
+        "confusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            43
+          ]
+        ]
+      }
+    },
+    "nobody": {
+      "false_sightings": 0.058,
+      "missed_people": 0.0145,
+      "n_nobody": 69
+    },
+    "wrong": [
+      {
+        "id": "kaggle-17-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.654
+      },
+      {
+        "id": "kaggle-18-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.961
+      },
+      {
+        "id": "kaggle-19-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.892
+      },
+      {
+        "id": "kaggle-27-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.475
+      },
+      {
+        "id": "kaggle-28-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.418
+      },
+      {
+        "id": "kaggle-29-0",
+        "label": "julus",
+        "guess": "none",
+        "p": 0.468
+      },
+      {
+        "id": "kaggle-30-0",
+        "label": "julus",
+        "guess": "none",
+        "p": 0.877
+      },
+      {
+        "id": "kaggle-31-0",
+        "label": "julus",
+        "guess": "none",
+        "p": 0.64
+      },
+      {
+        "id": "kaggle-32-none",
+        "label": "none",
+        "guess": "sujud",
+        "p": 0.824
+      },
+      {
+        "id": "kaggle-32-0",
+        "label": "julus",
+        "guess": "none",
+        "p": 0.45
+      },
+      {
+        "id": "kaggle-ck2oraq0r50kq0757hgzh6pgs-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.493
+      },
+      {
+        "id": "kaggle-ck2svi6zd8xmc0721602f55wy-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.604
+      },
+      {
+        "id": "kaggle-ck2ufj0o3mhd90721cmv86k1s-0",
+        "label": "sujud",
+        "guess": "ruku",
+        "p": 0.821
+      },
+      {
+        "id": "kaggle-ck35tpj9rukjo08119y6fnj90-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.488
+      },
+      {
+        "id": "kaggle-ck35vty5bdg470838ezhuk48n-0",
+        "label": "sujud",
+        "guess": "ruku",
+        "p": 0.784
+      },
+      {
+        "id": "kaggle-ck35w4jle1e5d0725hib9k984-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.795
+      },
+      {
+        "id": "kaggle-ck35wb0oxexbi0944jmw4esmt-0",
+        "label": "qiyam",
+        "guess": "none",
+        "p": 0.705
+      },
+      {
+        "id": "kaggle-IMG_1403.-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.763
+      },
+      {
+        "id": "kaggle-IMG_1421-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.657
+      },
+      {
+        "id": "kaggle-IMG_1440-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.775
+      },
+      {
+        "id": "kaggle-IMG_1441-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.929
+      },
+      {
+        "id": "kaggle-IMG_1442-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.549
+      },
+      {
+        "id": "kaggle-ruku100-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.824
+      },
+      {
+        "id": "kaggle-ruku100-1",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.967
+      },
+      {
+        "id": "kaggle-ruku100-3",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.995
+      },
+      {
+        "id": "kaggle-ruku100-5",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.396
+      },
+      {
+        "id": "kaggle-ruku100-6",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.984
+      },
+      {
+        "id": "kaggle-ruku100-7",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.867
+      },
+      {
+        "id": "kaggle-ruku103-0",
+        "label": "ruku",
+        "guess": "none",
+        "p": 0.779
+      },
+      {
+        "id": "kaggle-ruku107-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.987
+      },
+      {
+        "id": "kaggle-ruku108-none",
+        "label": "none",
+        "guess": "sujud",
+        "p": 0.865
+      },
+      {
+        "id": "kaggle-ruku111-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.815
+      },
+      {
+        "id": "kaggle-ruku115-0",
+        "label": "ruku",
+        "guess": "none",
+        "p": 0.546
+      },
+      {
+        "id": "kaggle-ruku116-0",
+        "label": "ruku",
+        "guess": "none",
+        "p": 0.847
+      },
+      {
+        "id": "kaggle-ruku147-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.514
+      },
+      {
+        "id": "kaggle-ruku86-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 1.0
+      },
+      {
+        "id": "kaggle-ruku87-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 1.0
+      },
+      {
+        "id": "kaggle-ruku88-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.973
+      },
+      {
+        "id": "kaggle-ruku94-none",
+        "label": "none",
+        "guess": "julus",
+        "p": 0.641
+      },
+      {
+        "id": "kaggle-ruku95-none",
+        "label": "none",
+        "guess": "qiyam",
+        "p": 0.742
+      },
+      {
+        "id": "kaggle-ruku96-none",
+        "label": "none",
+        "guess": "qiyam",
+        "p": 0.463
+      },
+      {
+        "id": "kaggle-ruku96-0",
+        "label": "ruku",
+        "guess": "none",
+        "p": 0.996
+      },
+      {
+        "id": "kaggle-SittingMO20-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.698
+      },
+      {
+        "id": "kaggle-SittingMO21-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.868
+      },
+      {
+        "id": "kaggle-SittingMO22-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.807
+      },
+      {
+        "id": "kaggle-SittingMO23-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.841
+      },
+      {
+        "id": "kaggle-SittingMO24-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.993
+      },
+      {
+        "id": "kaggle-SittingMO25-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.995
+      },
+      {
+        "id": "kaggle-SittingMO26-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.991
+      },
+      {
+        "id": "kaggle-SittingMO27-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.804
+      },
+      {
+        "id": "kaggle-SittingMO28-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.715
+      },
+      {
+        "id": "kaggle-SittingMO29-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.405
+      },
+      {
+        "id": "kaggle-SittingMO30-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.541
+      },
+      {
+        "id": "kaggle-SittingMO37-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.374
+      },
+      {
+        "id": "kaggle-SittingMo96-0",
+        "label": "julus",
+        "guess": "qiyam",
+        "p": 0.753
+      },
+      {
+        "id": "kaggle-sujud81-0",
+        "label": "sujud",
+        "guess": "ruku",
+        "p": 0.792
+      }
+    ]
+  },
+  "seed": 7,
+  "tensorflow": "2.19.1",
+  "keras_version": "3.12.4",
+  "machine": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+  "tflite": {
+    "n": 484,
+    "accuracy": 0.8967,
+    "macro_f1": 0.8957,
+    "per_class": {
+      "qiyam": {
+        "precision": 0.9067,
+        "recall": 0.9855,
+        "f1": 0.9444,
+        "n": 69
+      },
+      "ruku": {
+        "precision": 0.9388,
+        "recall": 0.8142,
+        "f1": 0.872,
+        "n": 113
+      },
+      "sujud": {
+        "precision": 0.7158,
+        "recall": 0.9714,
+        "f1": 0.8242,
+        "n": 70
+      },
+      "julus": {
+        "precision": 0.9929,
+        "recall": 0.8589,
+        "f1": 0.9211,
+        "n": 163
+      },
+      "none": {
+        "precision": 0.88,
+        "recall": 0.9565,
+        "f1": 0.9167,
+        "n": 69
+      }
+    },
+    "confusion": [
+      [
+        68,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        6,
+        92,
+        11,
+        0,
+        4
+      ],
+      [
+        0,
+        2,
+        68,
+        0,
+        0
+      ],
+      [
+        0,
+        4,
+        15,
+        140,
+        4
+      ],
+      [
+        1,
+        0,
+        1,
+        1,
+        66
+      ]
+    ],
+    "by_source": {
+      "imcspd": {
+        "n": 108,
+        "accuracy": 1.0,
+        "macro_f1": 0.8,
+        "per_class": {
+          "qiyam": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 42
+          },
+          "ruku": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 13
+          },
+          "sujud": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 10
+          },
+          "julus": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 43
+          },
+          "none": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          }
+        },
+        "confusion": [
+          [
+            42,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            13,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            10,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            43,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "kaggle": {
+        "n": 333,
+        "accuracy": 0.8498,
+        "macro_f1": 0.8407,
+        "per_class": {
+          "qiyam": {
+            "precision": 0.7879,
+            "recall": 0.963,
+            "f1": 0.8667,
+            "n": 27
+          },
+          "ruku": {
+            "precision": 0.9294,
+            "recall": 0.79,
+            "f1": 0.8541,
+            "n": 100
+          },
+          "sujud": {
+            "precision": 0.6824,
+            "recall": 0.9667,
+            "f1": 0.8,
+            "n": 60
+          },
+          "julus": {
+            "precision": 0.9898,
+            "recall": 0.8083,
+            "f1": 0.8899,
+            "n": 120
+          },
+          "none": {
+            "precision": 0.7188,
+            "recall": 0.8846,
+            "f1": 0.7931,
+            "n": 26
+          }
+        },
+        "confusion": [
+          [
+            26,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            6,
+            79,
+            11,
+            0,
+            4
+          ],
+          [
+            0,
+            2,
+            58,
+            0,
+            0
+          ],
+          [
+            0,
+            4,
+            15,
+            97,
+            4
+          ],
+          [
+            1,
+            0,
+            1,
+            1,
+            23
+          ]
+        ]
+      },
+      "synthetic": {
+        "n": 43,
+        "accuracy": 1.0,
+        "macro_f1": 0.2,
+        "per_class": {
+          "qiyam": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          },
+          "ruku": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          },
+          "sujud": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          },
+          "julus": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "n": 0
+          },
+          "none": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "n": 43
+          }
+        },
+        "confusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            43
+          ]
+        ]
+      }
+    },
+    "nobody": {
+      "false_sightings": 0.0435,
+      "missed_people": 0.0169,
+      "n_nobody": 69
+    },
+    "wrong": [
+      {
+        "id": "kaggle-16-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.526
+      },
+      {
+        "id": "kaggle-17-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.796
+      },
+      {
+        "id": "kaggle-18-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.927
+      },
+      {
+        "id": "kaggle-19-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.805
+      },
+      {
+        "id": "kaggle-23-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.629
+      },
+      {
+        "id": "kaggle-27-0",
+        "label": "julus",
+        "guess": "ruku",
+        "p": 0.439
+      },
+      {
+        "id": "kaggle-29-0",
+        "label": "julus",
+        "guess": "none",
+        "p": 0.403
+      },
+      {
+        "id": "kaggle-30-0",
+        "label": "julus",
+        "guess": "none",
+        "p": 0.647
+      },
+      {
+        "id": "kaggle-ck2oraq0r50kq0757hgzh6pgs-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.647
+      },
+      {
+        "id": "kaggle-ck2svi6zd8xmc0721602f55wy-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.444
+      },
+      {
+        "id": "kaggle-ck2ufj0o3mhd90721cmv86k1s-0",
+        "label": "sujud",
+        "guess": "ruku",
+        "p": 0.735
+      },
+      {
+        "id": "kaggle-ck35tpj9rukjo08119y6fnj90-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.621
+      },
+      {
+        "id": "kaggle-ck35vty5bdg470838ezhuk48n-0",
+        "label": "sujud",
+        "guess": "ruku",
+        "p": 0.79
+      },
+      {
+        "id": "kaggle-ck35w4jle1e5d0725hib9k984-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.616
+      },
+      {
+        "id": "kaggle-ck35wb0oxexbi0944jmw4esmt-0",
+        "label": "qiyam",
+        "guess": "none",
+        "p": 0.854
+      },
+      {
+        "id": "kaggle-IMG_1403.-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.744
+      },
+      {
+        "id": "kaggle-IMG_1421-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.505
+      },
+      {
+        "id": "kaggle-IMG_1440-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.644
+      },
+      {
+        "id": "kaggle-IMG_1441-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.897
+      },
+      {
+        "id": "kaggle-IMG_1442-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.745
+      },
+      {
+        "id": "kaggle-ruku100-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.951
+      },
+      {
+        "id": "kaggle-ruku100-1",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.856
+      },
+      {
+        "id": "kaggle-ruku100-3",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.978
+      },
+      {
+        "id": "kaggle-ruku100-5",
+        "label": "ruku",
+        "guess": "none",
+        "p": 0.82
+      },
+      {
+        "id": "kaggle-ruku100-6",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.918
+      },
+      {
+        "id": "kaggle-ruku103-0",
+        "label": "ruku",
+        "guess": "none",
+        "p": 0.91
+      },
+      {
+        "id": "kaggle-ruku107-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.968
+      },
+      {
+        "id": "kaggle-ruku108-none",
+        "label": "none",
+        "guess": "sujud",
+        "p": 0.924
+      },
+      {
+        "id": "kaggle-ruku110-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.385
+      },
+      {
+        "id": "kaggle-ruku111-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.787
+      },
+      {
+        "id": "kaggle-ruku115-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.521
+      },
+      {
+        "id": "kaggle-ruku116-0",
+        "label": "ruku",
+        "guess": "none",
+        "p": 0.978
+      },
+      {
+        "id": "kaggle-ruku147-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.499
+      },
+      {
+        "id": "kaggle-ruku83-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.742
+      },
+      {
+        "id": "kaggle-ruku86-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.999
+      },
+      {
+        "id": "kaggle-ruku87-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.999
+      },
+      {
+        "id": "kaggle-ruku88-0",
+        "label": "ruku",
+        "guess": "sujud",
+        "p": 0.935
+      },
+      {
+        "id": "kaggle-ruku92-0",
+        "label": "ruku",
+        "guess": "qiyam",
+        "p": 0.51
+      },
+      {
+        "id": "kaggle-ruku94-none",
+        "label": "none",
+        "guess": "julus",
+        "p": 0.792
+      },
+      {
+        "id": "kaggle-ruku96-none",
+        "label": "none",
+        "guess": "qiyam",
+        "p": 0.688
+      },
+      {
+        "id": "kaggle-ruku96-0",
+        "label": "ruku",
+        "guess": "none",
+        "p": 0.998
+      },
+      {
+        "id": "kaggle-SittingMO20-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.832
+      },
+      {
+        "id": "kaggle-SittingMO21-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.888
+      },
+      {
+        "id": "kaggle-SittingMO22-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.887
+      },
+      {
+        "id": "kaggle-SittingMO23-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.941
+      },
+      {
+        "id": "kaggle-SittingMO24-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.985
+      },
+      {
+        "id": "kaggle-SittingMO25-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.996
+      },
+      {
+        "id": "kaggle-SittingMO26-0",
+        "label": "julus",
+        "guess": "sujud",
+        "p": 0.991
+      },
+      {
+        "id": "kaggle-SittingMO29-0",
+        "label": "julus",
+        "guess": "none",
+        "p": 0.675
+      },
+      {
+        "id": "kaggle-SittingMO37-0",
+        "label": "julus",
+        "guess": "none",
+        "p": 0.523
+      }
+    ],
+    "bytes": 1107960
+  }
+}

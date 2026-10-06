@@ -5,6 +5,9 @@
 The intended product is a phone app, with Android first. Flutter owns
 navigation, chat, networking and fallback; Unity owns Robert's 3D presentation.
 All AI inference and agent orchestration run on the backend, never on the phone.
+The one model on the phone is the prayer-movement helper's posture classifier,
+which keeps camera frames on the device
+([`doc/prayer-movement-helper.md`](doc/prayer-movement-helper.md)).
 The web target remains a developer preview only.
 
 This is a portable Flutter application source package, intended for adult
@@ -17,8 +20,10 @@ implemented.
 
 | Path | Contents |
 |---|---|
-| `lib/` | Application source: `bridge/`, `data/`, `domain/`, `ui/` |
-| `assets/` | Runtime assets only — the static preview, the shared room backdrop and the Robert character package |
+| `lib/` | Application source: `bridge/`, `data/`, `domain/`, `posture/`, `ui/` |
+| `assets/` | Runtime assets only — the static preview, the shared room backdrop, the Robert character package and `models/prayer_posture.tflite` |
+| `ml/` | `prayer_posture/`: how the posture model is trained and exported, its metrics and its model card. No dataset images |
+| `integration_test/` | Checks that need a device: the bundled posture model on held-out photos |
 | `design/` | `ui-reference.png` layout reference (`ui.make`, its 6 MB Figma source, is untracked), plus from the emulator `room-on-device.png`, `customization-tab.png`, `thinking-bubble.png`, `grounded-answer.png`, `redirect-reply.png`, and the casual-chat set `chat-reply.png`, `chat-invitation.png`, `chat-feeling.png` and `faith-abstain.png`, and the outfit set `style-outfits.png`, `outfit-thobe.png` and `outfit-cowboy.png`, and the animation set `robert-greeting-wave.png`, `face-giggle.png`, `face-wink.png`, `robert-talking.png` and `face-starry.png` |
 | `unity/` | The Unity character-room project, its room builder and its test scripts |
 | `archive/` | Untracked: superseded character revisions and the packaged distributable |
@@ -216,7 +221,9 @@ Android builds succeed: `flutter build apk --debug` and `--release` both
 produce an APK (release 49.3 MB without a Unity export; 125 MB debug with the
 x86_64 export, which is a debug, single-ABI number and not a shipping size), and
 the Kotlin host in `android/app/src/main/kotlin/` compiles into both. The APK
-requests `INTERNET` only — no microphone, camera or location permission.
+requests `INTERNET` and, since 2026-10-06, `CAMERA` for the prayer-movement
+helper — no microphone, storage or location permission (the camera plugin's
+`RECORD_AUDIO` and `WRITE_EXTERNAL_STORAGE` are removed from the manifest).
 
 The app has been run on an **Android 16 x86_64 emulator**: the character room
 renders, the bridge handshake completes, an earned colour look sent over the
@@ -409,6 +416,28 @@ because not being sure, or being pointed to a grown-up, is not a mistake the
 child made. The safety label uses the steady ink colour
 rather than an alert colour. A long reply opens at its first sentence, and the
 sources are further down.
+
+## Prayer-movement practice
+
+Learn has a practice of the prayer movements: one rak'ah, step by step, with
+Next after each movement. A parent can turn on the **movement helper** in the
+parent area. The child can then turn on the front camera on the practice page,
+and an on-device model (`assets/models/prayer_posture.tflite`, 1.1 MB) moves the
+practice on when it sees the movement held. The camera is off until asked,
+shows a "Camera on" badge, and stops when the page closes or the app leaves the
+screen. No frame is kept or sent. The design, its controls and what it must
+never claim are in [`doc/prayer-movement-helper.md`](doc/prayer-movement-helper.md);
+the model's data, licences and accuracy are in
+[`ml/prayer_posture/MODEL_CARD.md`](ml/prayer_posture/MODEL_CARD.md). The
+model is CC BY-NC 4.0 (non-commercial) because of one of its training sets.
+
+Build without it with `--dart-define=POSTURE_HELPER=false`. To check the model
+on a device, push held-out photos and run the integration test (see the test's
+header):
+
+```bash
+flutter test integration_test/posture_model_test.dart -d emulator-5554
+```
 
 ## Verification coverage and remaining work
 

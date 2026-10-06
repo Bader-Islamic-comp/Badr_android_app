@@ -6,6 +6,62 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-10-06 (feature/cv-prayer-classifier)
+
+### Added
+
+- **Prayer-movement practice, with an on-device movement helper.**
+  - Learn has a new practice: the movements of one rak'ah, step by step. The child taps Next after each one
+    (`lib/ui/prayer_practice_page.dart`, `lib/posture/movement_practice.dart`).
+  - With the helper on, the front camera and a 1.1 MB TensorFlow Lite model recognise four postures (qiyam,
+    ruku, sujud and julus) and tell when nobody is in view. The practice moves on when the model has seen the
+    step held for 1.2 s; nobody in view never moves it.
+  - Frames are classified in memory, at most one every 300 ms, and nothing is kept or sent
+    (`lib/posture/camera_posture_source.dart`).
+  - The parent area's "Movement helper (camera)" switch is off at every start. The camera starts only from the
+    practice page, shows a "Camera on" badge, and stops when the page closes or the app leaves the screen.
+  - The page says what the helper sees, never that a movement is wrong, and that it "cannot tell whether a
+    prayer is correct or accepted". No rewards come from it.
+  - The design and its controls are in `doc/prayer-movement-helper.md`. `--dart-define=POSTURE_HELPER=false`
+    builds without it.
+- **The posture model and how it is made** (`ml/prayer_posture/`).
+  - MobileNetV3-Small, trained on the Kaggle "Salat Postures" set (CC BY-NC 4.0) and the standing-prayer part of
+    Mendeley IMCSPD v2 (CC BY 4.0), 2,638 people in all. A fifth class, "none", is trained on 248 squares of the
+    photos clear of anyone and 300 generated pictures.
+  - Splits keep photos of one session, sequence or near-identical picture together.
+  - Held-out accuracy is 89.7% for the exported model (484 samples), 100% on the IMCSPD session it never saw.
+    Empty pictures are taken for a posture 4.3% of the time, and people for nobody 1.7%. Sujud is over-called
+    (72% precision). The cross-dataset checks and the error review are in the model card.
+  - **The model inherits CC BY-NC 4.0: non-commercial use only** until it is retrained without the Kaggle set.
+    The datasets' attribution is in the app's licence list, which the parent area now opens.
+- **Tests.**
+  - 23 new tests: the model input (letterbox, rotation, BT.601 colour), nobody in view, the steadying of
+    readings, the practice steps, the label order and bundled model, and the page with a scripted camera (starts
+    only when asked, stops on leaving, refused permission, parent switch).
+  - `integration_test/posture_model_test.dart` runs the bundled model on a device against held-out photos. On
+    the Android 16 x86_64 emulator it read 435 of 484 correctly (89.9%), at 180 ms per inference.
+  - 170 tests pass and `flutter analyze` is clean.
+
+### Fixed (found on the emulator)
+
+- **An empty room ticked off a step.**
+  - The first model knew only the four postures. The emulator's camera showed a generated scene with nobody in
+    it, the model said "Standing", and the practice moved on.
+  - The model now has a fifth output, "none", and the app reads it as nothing seen (`PostureReading.top` is
+    null).
+  - With the same scene in view for 20 s, the practice stays on "The helper is watching…".
+
+### Changed
+
+- **`AGENTS.md` and the roadmap name the helper as the one exception** to "no on-device inference" and "no camera
+  verification". The product owner approved it on 2026-10-06. Every other camera or body-motion feature still
+  needs its own approval.
+- **Permissions:** the APK now asks for `CAMERA`. The camera plugin's `RECORD_AUDIO` and `WRITE_EXTERNAL_STORAGE`
+  are removed from the merged manifest, and the camera is optional hardware.
+- **New dependencies:** `camera` 0.12.1 (CameraX) and `tflite_flutter` 0.12.1 (LiteRT 1.4.0).
+- **`android/build.gradle.kts`:** `tflite_flutter` compiles its Java for JVM 11 but left its Kotlin at the build JDK's target
+  (25), which Gradle rejects. Its Kotlin now targets 11 too.
+
 ## Unreleased — 2026-10-05 (day2/competition-goals)
 
 ### Fixed

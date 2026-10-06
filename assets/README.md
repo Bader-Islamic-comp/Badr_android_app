@@ -18,6 +18,10 @@ of here.
   is the static-avatar preview used by the Flutter fallback.
 - `looks/` — the Style tab's outfit thumbnails, downscaled from
   `robert/previews/<skin>.png`.
+- `models/` — the on-device prayer-posture classifier
+  (`prayer_posture.tflite`, 1.1 MB) and its label order. It is trained by
+  `../ml/prayer_posture/` and described in its `MODEL_CARD.md`; it inherits the
+  CC BY-NC 4.0 licence of one of its training sets.
 
 The Unity room imports from `robert/`; see
 [`../unity/README.md`](../unity/README.md). Copy only the selected runtime

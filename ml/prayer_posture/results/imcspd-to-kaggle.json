@@ -1,0 +1,213 @@
+{
+  "model": "prayer-posture-v1",
+  "classes": [
+    "qiyam",
+    "ruku",
+    "sujud",
+    "julus",
+    "none"
+  ],
+  "input": {
+    "shape": [
+      1,
+      224,
+      224,
+      3
+    ],
+    "range": [
+      0,
+      255
+    ],
+    "layout": "RGB, letterboxed with gray 114"
+  },
+  "output": {
+    "shape": [
+      1,
+      5
+    ],
+    "order": [
+      "qiyam",
+      "ruku",
+      "sujud",
+      "julus",
+      "none"
+    ]
+  },
+  "train_sources": [
+    "imcspd",
+    "synthetic"
+  ],
+  "test_sources": [
+    "kaggle"
+  ],
+  "counts": {
+    "train": 738,
+    "val": 118,
+    "test": 2179
+  },
+  "epochs": {
+    "head": 8,
+    "tune": 7
+  },
+  "val_accuracy": 0.6186,
+  "keras": {
+    "n": 2179,
+    "accuracy": 0.5466,
+    "macro_f1": 0.5038,
+    "per_class": {
+      "qiyam": {
+        "precision": 0.4873,
+        "recall": 0.9488,
+        "f1": 0.6439,
+        "n": 527
+      },
+      "ruku": {
+        "precision": 0.6638,
+        "recall": 0.2932,
+        "f1": 0.4068,
+        "n": 532
+      },
+      "sujud": {
+        "precision": 0.5508,
+        "recall": 0.7868,
+        "f1": 0.648,
+        "n": 441
+      },
+      "julus": {
+        "precision": 0.5347,
+        "recall": 0.2506,
+        "f1": 0.3412,
+        "n": 431
+      },
+      "none": {
+        "precision": 0.9302,
+        "recall": 0.3226,
+        "f1": 0.479,
+        "n": 248
+      }
+    },
+    "confusion": [
+      [
+        500,
+        3,
+        7,
+        17,
+        0
+      ],
+      [
+        187,
+        156,
+        151,
+        35,
+        3
+      ],
+      [
+        28,
+        45,
+        347,
+        18,
+        3
+      ],
+      [
+        221,
+        8,
+        94,
+        108,
+        0
+      ],
+      [
+        90,
+        23,
+        31,
+        24,
+        80
+      ]
+    ],
+    "by_source": {
+      "kaggle": {
+        "n": 2179,
+        "accuracy": 0.5466,
+        "macro_f1": 0.5038,
+        "per_class": {
+          "qiyam": {
+            "precision": 0.4873,
+            "recall": 0.9488,
+            "f1": 0.6439,
+            "n": 527
+          },
+          "ruku": {
+            "precision": 0.6638,
+            "recall": 0.2932,
+            "f1": 0.4068,
+            "n": 532
+          },
+          "sujud": {
+            "precision": 0.5508,
+            "recall": 0.7868,
+            "f1": 0.648,
+            "n": 441
+          },
+          "julus": {
+            "precision": 0.5347,
+            "recall": 0.2506,
+            "f1": 0.3412,
+            "n": 431
+          },
+          "none": {
+            "precision": 0.9302,
+            "recall": 0.3226,
+            "f1": 0.479,
+            "n": 248
+          }
+        },
+        "confusion": [
+          [
+            500,
+            3,
+            7,
+            17,
+            0
+          ],
+          [
+            187,
+            156,
+            151,
+            35,
+            3
+          ],
+          [
+            28,
+            45,
+            347,
+            18,
+            3
+          ],
+          [
+            221,
+            8,
+            94,
+            108,
+            0
+          ],
+          [
+            90,
+            23,
+            31,
+            24,
+            80
+          ]
+        ]
+      }
+    },
+    "nobody": {
+      "false_sightings": 0.2863,
+      "missed_people": 0.001,
+      "n_nobody": 248
+    },
+    "wrong_count": 988
+  },
+  "seed": 7,
+  "tensorflow": "2.19.1",
+  "keras_version": "3.12.4",
+  "machine": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD"
+}

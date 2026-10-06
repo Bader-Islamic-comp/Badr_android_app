@@ -10,13 +10,19 @@ dependencies:
   http: ^1.2.2
   cupertino_icons: ^1.0.8
   uuid: ^4.5.1
+  camera: ^0.12.1
+  tflite_flutter: ^0.12.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  integration_test:
+    sdk: flutter
 flutter:
   uses-material-design: true
   assets:
     - assets/robert/Robert.png
     - assets/room/backdrop_desert.png
     - assets/looks/
+    - assets/models/prayer_posture.tflite
+    - assets/models/prayer_posture_labels.txt
