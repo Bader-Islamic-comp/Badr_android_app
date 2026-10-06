@@ -12,7 +12,7 @@ Read `doc/product-architecture-roadmap.md` before making product, architecture, 
 
 - Optimize for child safety, religious accuracy, privacy, and parental control before engagement or feature breadth.
 - Treat the child experience as child-directed. Do not rely on a self-declared age gate to weaken protections.
-- Do not add advertising, behavioral tracking, public profiles, child-to-child messaging, open-web retrieval, loot boxes, public leaderboards, camera verification, location-based proof, or always-listening audio without an approved architecture and safeguarding review. The prayer-movement helper (`doc/prayer-movement-helper.md`, approved by the product owner on 2026-10-06) is the one camera feature: on-device practice feedback that verifies nothing. Keep within its controls; any other camera use needs its own approval.
+- Do not add advertising, behavioral tracking, public profiles, child-to-child messaging, open-web retrieval, loot boxes, public leaderboards, camera verification, location-based proof, or always-listening audio without an approved architecture and safeguarding review. The prayer-movement helper (`doc/prayer-movement-helper.md`, approved by the product owner on 2026-10-06) is the one camera feature: on-device practice feedback that verifies nothing. Keep within its controls; any other camera use needs its own approval. The voice preview (`doc/voice-preview.md`, approved by the product owner on 2026-10-06 within the backend's development boundary) is the one microphone and audio feature: hold-to-talk recordings kept only in memory, Robert's voice on request, and pronunciation practice that is never a verdict. It is for adult operators in development, not for children until the DPIA and the release gate's voice items are green. Keep within its controls; any other microphone or audio use needs its own approval.
 - Do not describe software verification as proving that prayer, recitation, or another religious act was spiritually valid or accepted.
 - Do not punish, shame, frighten, or manipulate a child into worship. Rewards represent learning effort and practice, not religious merit.
 - Do not automatically ban a child for inappropriate questions. Apply safe redirection, bounded cooldowns, and reviewed safeguarding flows.
@@ -30,7 +30,7 @@ Read `doc/product-architecture-roadmap.md` before making product, architecture, 
 
 ### Flutter
 
-Flutter owns authentication, household and child-profile state, parental gates, navigation, chat UI, microphone permissions, lessons, challenges, wallet/inventory UI, networking, retries, secure local storage, and the fallback experience. It also owns the movement helper: the camera permission, the on-device posture model, and its parent switch and kill switch.
+Flutter owns authentication, household and child-profile state, parental gates, navigation, chat UI, microphone permissions, lessons, challenges, wallet/inventory UI, networking, retries, secure local storage, and the fallback experience. It also owns the movement helper: the camera permission, the on-device posture model, and its parent switch and kill switch. And it owns the voice preview's client side: the microphone permission, recording into memory and the WAV header, playback from memory, and its parent switch and kill switch. Speech recognition and synthesis stay behind the backend; the app never calls the speech service.
 
 ### Unity
 
@@ -96,7 +96,8 @@ Do not silently switch to an unreviewed model or speech provider. Provider addit
 - A guardian account owns pseudonymous child profiles; a child should not need an email address.
 - Collect the minimum data required for the current feature.
 - Never store voiceprints or perform emotion recognition.
-- Prefer hold-to-talk with a visible listening indicator and bounded recordings.
+- Prefer hold-to-talk with a visible listening indicator and bounded recordings. The voice preview does exactly this; see `doc/voice-preview.md` for its controls and what it must never keep.
+- The release gate's `features.voice` stays `false`. The voice preview is the separate `features.speech`, which only the backend's development mode may turn on.
 - Raw child audio is transient and deleted immediately after its approved purpose by default.
 - Do not retain raw transcripts by default. Store structured learning progress rather than conversational surveillance.
 - Do not embed child utterances, names, distress disclosures, or inferred beliefs in the vector database.
