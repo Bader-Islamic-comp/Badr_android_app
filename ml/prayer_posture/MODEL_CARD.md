@@ -232,6 +232,11 @@ of the other shows how far the model carries to people and rooms it has not
 seen. These models were trained for the check and are not shipped. In both,
 fine-tuning stopped early, after 7 epochs.
 
+These checks were run with v1's data preparation: the sideways photos as
+stored and all 248 "none" squares (`"model": "prayer-posture-v1"` in
+`results/kaggle-to-imcspd.json` and `results/imcspd-to-kaggle.json`). They have
+not been re-run for v2.
+
 | Trained on → tested on | Accuracy | Per-posture recall | "None" |
 | --- | --- | --- | --- |
 | Kaggle → all of IMCSPD (707) | 81.3% | qiyam 98.7%, ruku 75.6%, sujud 75.8%, julus 71.5% (79 of 295 read as qiyam) | none in the test set |
@@ -243,13 +248,19 @@ why the shipped model learns from both.
 
 ### On a device
 
-`integration_test/posture_model_test.dart` runs the same 484 test pictures
-through the app's Dart input code and the Android runtime (LiteRT 1.4.0). On the
-Android 16 x86_64 emulator it gets **435 right (89.9%)**, against 89.7% for the
-same file in Python, at 180 ms per inference on the emulated CPU. The page
-classifies at most one frame every 300 ms, so even that leaves room.
+`integration_test/posture_model_test.dart` runs the test pictures through the
+app's Dart input code and the Android runtime (LiteRT 1.4.0).
 
-| True ↓ / seen → | qiyam | ruku | sujud | julus | none |
+**v2's file has not been checked on a device yet.** The same test now runs over
+v2's 503 test pictures and also prints the counts at the thresholds. Its result
+goes here once it has been run on the emulator.
+
+**v1's file,** on v1's 484 test pictures: on the Android 16 x86_64 emulator it
+got **435 right (89.9%)**, against 89.7% for the same file in Python, at 180 ms
+per inference on the emulated CPU. The page classifies at most one frame every
+300 ms, so even that leaves room.
+
+| v1 file: true ↓ / seen → | qiyam | ruku | sujud | julus | none |
 | --- | --- | --- | --- | --- | --- |
 | qiyam (69) | 68 | 0 | 0 | 0 | 1 |
 | ruku (113) | 4 | 92 | 13 | 0 | 4 |
@@ -262,16 +273,18 @@ classifies at most one frame every 300 ms, so even that leaves room.
 | Version | Over 20 s of that scene |
 | --- | --- |
 | Four-class | Said "Standing" and completed a step |
-| This model | Stayed on "The helper is watching…" |
+| v1, the first five-class model | Stayed on "The helper is watching…" |
 
-That scene looks like the generated block patterns, so the held-out false
-sighting rate above is the fairer measure.
+v2 is still to be checked the same way. That scene looks like the generated
+block patterns, so the held-out false sighting rate above is the fairer
+measure.
 
 ## Limits
 
 - **Children:** it has not been evaluated on young children as a group,
-  whose proportions differ. A few Kaggle series of older boys are all it has. No child's picture may be collected to check it. Any
-  test with children must be designed with the safeguarding review.
+  whose proportions differ. A few Kaggle series of older boys are all it has.
+  No child's picture may be collected to check it. Any test with children must
+  be designed with the safeguarding review.
 - **Sujud is still the weakest call,** at 87% test precision (v1: 72% on its
   own test split). Most of what is left is small figures bowing in a packed
   crowd, which a phone held for one child should not see, but a man sitting

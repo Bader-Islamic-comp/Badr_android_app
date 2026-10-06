@@ -24,14 +24,15 @@ Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
     prayer is correct or accepted". No rewards come from it.
   - The design and its controls are in `doc/prayer-movement-helper.md`. `--dart-define=POSTURE_HELPER=false`
     builds without it.
-- **The posture model and how it is made** (`ml/prayer_posture/`).
+- **The posture model and how it is made** (`ml/prayer_posture/`). This is the first model, `prayer-posture-v1`;
+  v2 replaced it the same day (see Changed).
   - MobileNetV3-Small, trained on the Kaggle "Salat Postures" set (CC BY-NC 4.0) and the standing-prayer part of
-    Mendeley IMCSPD v2 (CC BY 4.0), 2,638 people in all. A fifth class, "none", is trained on 248 squares of the
-    photos clear of anyone and 300 generated pictures.
+    Mendeley IMCSPD v2 (CC BY 4.0), 2,638 people in all. In v1 a fifth class, "none", was trained on 248 squares
+    of the photos meant to be clear of anyone and 300 generated pictures.
   - Splits keep photos of one session, sequence or near-identical picture together.
-  - Held-out accuracy is 89.7% for the exported model (484 samples), 100% on the IMCSPD session it never saw.
-    Empty pictures are taken for a posture 4.3% of the time, and people for nobody 1.7%. Sujud is over-called
-    (72% precision). The cross-dataset checks and the error review are in the model card.
+  - v1's held-out accuracy was 89.7% for the exported model (484 samples), 100% on the IMCSPD session it never
+    saw. Empty pictures were taken for a posture 4.3% of the time, and people for nobody 1.7%. Sujud was
+    over-called (72% precision). The cross-dataset checks in the model card are still v1's.
   - **The model inherits CC BY-NC 4.0: non-commercial use only** until it is retrained without the Kaggle set.
     The datasets' attribution is in the app's licence list, which the parent area now opens.
 - **Tests.**
@@ -39,7 +40,7 @@ Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
     readings, the practice steps, the label order and bundled model, and the page with a scripted camera (starts
     only when asked, stops on leaving, refused permission, parent switch).
   - `integration_test/posture_model_test.dart` runs the bundled model on a device against held-out photos. On
-    the Android 16 x86_64 emulator it read 435 of 484 correctly (89.9%), at 180 ms per inference.
+    the Android 16 x86_64 emulator v1's file read 435 of 484 correctly (89.9%), at 180 ms per inference.
   - 170 tests pass and `flutter analyze` is clean.
 
 ### Fixed (found on the emulator)
@@ -49,10 +50,30 @@ Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
     it, the model said "Standing", and the practice moved on.
   - The model now has a fifth output, "none", and the app reads it as nothing seen (`PostureReading.top` is
     null).
-  - With the same scene in view for 20 s, the practice stays on "The helper is watching…".
+  - With the same scene in view for 20 s, the practice stayed on "The helper is watching…" with v1. v2 is still
+    to be checked this way.
 
 ### Changed
 
+- **The posture model is now `prayer-posture-v2`.** It is retrained on cleaned data, with a threshold per posture.
+  - Two reviewed lists beside `prepare.py`, each confirmed by eye on contact sheets: 222 Kaggle photos stored on
+    their side are turned upright (`kaggle_rotations.csv`), and 31 "none" squares with a person in them are
+    dropped (`kaggle_none_excluded.csv`). The sideways photos made up about two in five of v1's test errors.
+  - Each posture's threshold is set on the validation split by `calibrate.py` (`results/thresholds.json`) and
+    copied into `PostureSmoother.defaultThresholds`, which replaces the single `minConfidence`.
+    `test/posture_test.dart` checks that the two match. For v2 all four are 0.6, the bar the app used before.
+  - New splits: 2,243 train, 409 val, 503 test. The IMCSPD session and the generated pictures held out for test
+    are v1's; the Kaggle test groups are new.
+  - Held-out accuracy is 97.0% for the exported model (503 samples), macro-F1 0.968. None of the 77 empty test
+    pictures is taken for a posture.
+  - On the 214 samples both models held out, v1 scores 89.7% and v2 94.4%. v1 on the same pictures turned
+    upright scores 93.9%, so most of the gain is the data fix.
+  - Sujud is still the weakest call, at 87.1% test precision. Most wrong sujud calls are small figures in one
+    photo of a packed mosque, but a man sitting, seen from the side, can still read as sujud.
+  - The cross-dataset checks were run with v1's data preparation and have not been re-run for v2.
+  - `integration_test/posture_model_test.dart` also prints the counts at the thresholds now. v2's file has not
+    been run on the emulator yet.
+  - With v2 and the drawings in, 183 tests pass and `flutter analyze` is clean (Flutter 3.47.5, on Linux).
 - **`AGENTS.md` and the roadmap name the helper as the one exception** to "no on-device inference" and "no camera
   verification". The product owner approved it on 2026-10-06. Every other camera or body-motion feature still
   needs its own approval.
