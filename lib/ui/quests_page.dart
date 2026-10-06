@@ -7,9 +7,12 @@ import 'widgets.dart';
 /// Challenges and the server-owned reward balance. There is no streak, ranking
 /// or loss framing here, and nothing claims religious merit.
 class QuestsPage extends StatelessWidget {
-  const QuestsPage({super.key, required this.model});
+  const QuestsPage({super.key, required this.model, this.onOpenGame});
 
   final CompanionController model;
+
+  /// Opens the dhikr game. Null hides it: the speech preview is not on.
+  final VoidCallback? onOpenGame;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -58,6 +61,10 @@ class QuestsPage extends StatelessWidget {
                       ]),
                 ),
               ),
+          if (onOpenGame != null) ...[
+            _game(context),
+            const SizedBox(height: 16),
+          ],
           _balance(context),
           const SizedBox(height: 16),
           ConnectionCard(
@@ -88,6 +95,23 @@ class QuestsPage extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w700)),
           ]),
         ),
+      );
+
+  /// The dhikr game: a star for each round practised, from the service.
+  Widget _game(BuildContext context) => Panel(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.graphic_eq_rounded, color: teal, size: 30),
+          const SizedBox(height: 12),
+          Text('Dhikr game · لعبة الذكر',
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text('Listen to Robert, then say a short dhikr yourself. Each '
+              'round you finish earns a star for practising.'),
+          const SizedBox(height: 14),
+          FilledButton(
+              onPressed: model.busy ? null : onOpenGame,
+              child: const Text('Play the dhikr game')),
+        ]),
       );
 
   Widget _balance(BuildContext context) => Panel(

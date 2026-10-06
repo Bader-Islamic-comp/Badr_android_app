@@ -11,6 +11,10 @@ const sand = Color(0xFFF3E6D1);
 const hairline = Color(0xFFE2E5DB);
 const muted = Color(0xFF4F6D6B);
 
+/// The listening dot: red, so nobody has to guess that the microphone is on.
+/// Used for nothing else.
+const listeningRed = Color(0xFFC62828);
+
 /// Scrim for the full-bleed character page. With the room composited behind
 /// Flutter the page itself is transparent, so anything carrying text needs its
 /// own surface: a 3D scene is not a background you can rely on for contrast.

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'bridge/avatar_room.dart';
 import 'domain/companion_controller.dart';
 import 'posture/posture_source.dart';
+import 'speech/voice_kit.dart';
 import 'theme.dart';
 import 'ui/home_page.dart';
 import 'ui/robert_cues.dart';
@@ -38,10 +39,14 @@ trained on them.'''),
     );
 
 class CompanionApp extends StatelessWidget {
-  const CompanionApp({super.key, this.controller, this.room, this.startTimer});
+  const CompanionApp(
+      {super.key, this.controller, this.room, this.startTimer, this.voice});
 
   final CompanionController? controller;
   final AvatarRoom? room;
+
+  /// The speech preview's parts; tests pass fakes. See [VoiceKit].
+  final VoiceKit? voice;
 
   /// Times how long Robert talks; tests replace it. See [CompanionHome].
   final StartTimer? startTimer;
@@ -52,6 +57,9 @@ class CompanionApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: companionTheme(),
         home: CompanionHome(
-            controller: controller, room: room, startTimer: startTimer),
+            controller: controller,
+            room: room,
+            startTimer: startTimer,
+            voice: voice),
       );
 }
