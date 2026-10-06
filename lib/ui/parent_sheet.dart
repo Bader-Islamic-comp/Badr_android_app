@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../bridge/avatar_room.dart';
+import '../data/demo_api.dart';
 import '../domain/companion_controller.dart';
 import '../posture/posture_source.dart';
 import '../speech/voice_kit.dart';
@@ -228,11 +230,20 @@ class _ParentSheetState extends State<_ParentSheet> {
                 // page, which now carries only Robert and his last reply.
                 ListenableBuilder(
                   listenable: widget.model,
-                  builder: (context, _) => ConnectionCard(
-                    connected: widget.model.connected,
-                    configured: widget.model.api.config.enabled,
-                    busy: widget.model.busy,
-                    onConnect: widget.model.connect,
+                  builder: (context, _) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ConnectionCard(
+                        connected: widget.model.connected,
+                        configured: widget.model.api.config.enabled,
+                        busy: widget.model.busy,
+                        onConnect: widget.model.connect,
+                      ),
+                      // The browser preview cannot reach the service: its
+                      // CORS is off and an https page cannot call http.
+                      if (!widget.model.connected && !kIsWeb)
+                        _ServiceForm(model: widget.model),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -251,4 +262,91 @@ class _ParentSheetState extends State<_ParentSheet> {
               ]),
         ),
       );
+}
+
+/// Where an adult points the app at a development service they run, such as
+/// the backend's Docker demo (`deploy/start-demo.*` prints both values). The
+/// token stays in memory and is gone after a relaunch.
+class _ServiceForm extends StatefulWidget {
+  const _ServiceForm({required this.model});
+
+  final CompanionController model;
+
+  @override
+  State<_ServiceForm> createState() => _ServiceFormState();
+}
+
+class _ServiceFormState extends State<_ServiceForm> {
+  late final address =
+      TextEditingController(text: widget.model.api.config.baseUrl);
+  final token = TextEditingController();
+
+  @override
+  void dispose() {
+    address.dispose();
+    token.dispose();
+    super.dispose();
+  }
+
+  void _connect() {
+    FocusScope.of(context).unfocus();
+    widget.model.connectTo(DemoConfig(
+      baseUrl: address.text.trim(),
+      token: token.text.trim(),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notice = widget.model.notice;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Development service',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          const Text('For adult reviewers running the synthetic demo server. '
+              'Enter the address and token it printed. Plain http works only '
+              'for this device or a private network address, such as a '
+              'computer on the same Wi-Fi.'),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('service-address'),
+            controller: address,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: const InputDecoration(
+                labelText: 'Server address',
+                hintText: 'http://192.168.1.20:8000',
+                border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('service-token'),
+            controller: token,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: const InputDecoration(
+                labelText: 'Operator token', border: OutlineInputBorder()),
+            onSubmitted: (_) => _connect(),
+          ),
+          if (notice != null) ...[
+            const SizedBox(height: 8),
+            Text(notice,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            key: const Key('service-connect'),
+            onPressed: widget.model.busy ? null : _connect,
+            child: Text(widget.model.busy ? 'Connecting…' : 'Connect'),
+          ),
+        ],
+      ),
+    );
+  }
 }

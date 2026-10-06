@@ -163,6 +163,21 @@ class CompanionController extends ChangeNotifier {
     }
   }
 
+  /// Points the app at a service an adult entered in the parent area, then
+  /// connects. Only before a connection: switching services mid-session
+  /// would mix one service's conversation and keys with another's.
+  Future<void> connectTo(DemoConfig config) {
+    if (busy || connected || _disposed) return Future.value();
+    if (!config.enabled) {
+      notice = 'Check the server address and token. Plain http works only '
+          'for this device or a private network address.';
+      _changed();
+      return Future.value();
+    }
+    api.config = config;
+    return connect();
+  }
+
   Future<void> connect() => _operate(() async {
         connected = false;
         groundedAnswers = false;

@@ -11,6 +11,9 @@
          the button; a build with VOICE=false never asks. The camera plugin
          also declares storage, which nothing here uses, so it is removed. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- The development service an adult connects to in the parent area
+         (lib/data/demo_api.dart). The app makes no other requests. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         tools:node="remove" />
@@ -26,6 +29,7 @@
         android:label="companion_mobile"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:appCategory="productivity"
         tools:replace="android:appCategory">
 

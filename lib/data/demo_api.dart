@@ -18,16 +18,44 @@ class DemoConfig {
   final String baseUrl;
   final String token;
 
+  /// Plain `http` is accepted only for this device, the emulator's host and
+  /// private network addresses (a reviewer's Docker server on the same
+  /// Wi-Fi). Anything else must use `https`. The release network security
+  /// config allows cleartext so that this rule, not the OS, decides.
   bool get enabled {
     final uri = Uri.tryParse(baseUrl);
     return token.isNotEmpty &&
+        token.length <= 256 &&
         uri != null &&
         ['http', 'https'].contains(uri.scheme) &&
         uri.host.isNotEmpty &&
         uri.userInfo.isEmpty &&
         uri.query.isEmpty &&
         uri.fragment.isEmpty &&
-        (uri.path.isEmpty || uri.path == '/');
+        (uri.path.isEmpty || uri.path == '/') &&
+        (uri.scheme == 'https' || isPrivateHost(uri.host));
+  }
+
+  /// `localhost` or an IPv4 literal in a loopback or private range
+  /// (127/8, 10/8, 172.16/12, 192.168/16). Names other than `localhost`
+  /// are not private: they could resolve anywhere.
+  static bool isPrivateHost(String host) {
+    if (host == 'localhost') return true;
+    final parts = host.split('.');
+    if (parts.length != 4) return false;
+    final octets = <int>[];
+    for (final part in parts) {
+      final value = int.tryParse(part);
+      if (value == null || value < 0 || value > 255 || '$value' != part) {
+        return false;
+      }
+      octets.add(value);
+    }
+    final a = octets[0], b = octets[1];
+    return a == 127 ||
+        a == 10 ||
+        (a == 172 && b >= 16 && b <= 31) ||
+        (a == 192 && b == 168);
   }
 }
 
@@ -46,7 +74,10 @@ class DemoApi {
   DemoApi(this.config, {http.Client? client})
       : _client = client ?? http.Client();
 
-  final DemoConfig config;
+  /// The service this app talks to: the build's `--dart-define` values, or
+  /// what an adult entered in the parent area. Kept in memory only, so a
+  /// relaunch forgets an entered token.
+  DemoConfig config;
   final http.Client _client;
   static String newKey() => const Uuid().v4();
 
