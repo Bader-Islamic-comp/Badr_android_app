@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../bridge/avatar_bridge.dart';
 import '../bridge/avatar_room.dart';
 import '../domain/companion_controller.dart';
 import '../domain/models.dart';
+import '../speech/robert_voice.dart';
 import '../theme.dart';
 import 'character_stage.dart';
 import 'source_reference.dart';
@@ -25,10 +28,25 @@ class TalkPage extends StatelessWidget {
     required this.room,
     required this.onTapCharacter,
     this.overRoom = false,
+    this.voice,
+    this.voiceStrip,
   });
 
   final CompanionController model;
   final AvatarRoom room;
+
+  /// Robert's voice, when the speech preview offers it: a Listen button under
+  /// each reply it can read aloud. Null hides it.
+  final RobertVoice? voice;
+
+  /// The line about a spoken question, at the foot of the page just above the
+  /// composer. It comes out of the page's own room, never the composer's, so
+  /// on a short screen with large text nothing is pushed off; it scrolls.
+  final Widget? voiceStrip;
+
+  static const preparingCopy = 'Robert’s voice is getting ready…';
+  static const speakingCopy = 'Robert is speaking…';
+  static const unavailableCopy = 'Robert’s voice isn’t ready for this reply.';
 
   /// True when a room is composited behind the page.
   final bool overRoom;
@@ -72,6 +90,12 @@ class TalkPage extends StatelessWidget {
               Expanded(
                   child:
                       Align(alignment: Alignment.bottomCenter, child: reply)),
+            if (voiceStrip != null)
+              ConstrainedBox(
+                constraints:
+                    BoxConstraints(maxHeight: math.min(height * 0.3, 120)),
+                child: SingleChildScrollView(child: voiceStrip),
+              ),
           ]);
         },
       );
@@ -154,6 +178,10 @@ class TalkPage extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodyLarge),
                     if (reply.type.cited && reply.sources.isNotEmpty)
                       _sources(reply),
+                    if (voice != null &&
+                        reply.turnId != null &&
+                        reply.type.speakable)
+                      _listen(context, voice!, reply.turnId!),
                   ],
                 ]),
           ),
@@ -181,6 +209,57 @@ class TalkPage extends StatelessWidget {
               style: TextStyle(fontSize: 15, color: muted)),
         ),
       ]);
+
+  /// Listen, under a reply Robert can read aloud. While the service makes the
+  /// voice it says so; parts play as they are ready, and Stop ends it.
+  Widget _listen(BuildContext context, RobertVoice voice, String turnId) =>
+      ListenableBuilder(
+        listenable: voice,
+        builder: (context, _) {
+          final mine = voice.turnId == turnId;
+          final status = mine ? voice.status : RobertVoiceStatus.idle;
+          final note = switch (status) {
+            RobertVoiceStatus.preparing => preparingCopy,
+            RobertVoiceStatus.playing => speakingCopy,
+            RobertVoiceStatus.unavailable => unavailableCopy,
+            RobertVoiceStatus.slow => RobertVoice.slowCopy,
+            RobertVoiceStatus.problem => voice.problem,
+            RobertVoiceStatus.idle => null,
+          };
+          final active = mine && voice.active;
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                children: [
+                  if (status != RobertVoiceStatus.unavailable)
+                    TextButton.icon(
+                      onPressed:
+                          active ? voice.stop : () => voice.listen(turnId),
+                      icon: status == RobertVoiceStatus.preparing
+                          ? SizedBox.square(
+                              dimension: 16,
+                              child: MediaQuery.disableAnimationsOf(context)
+                                  ? const Icon(Icons.hourglass_empty_rounded,
+                                      size: 16)
+                                  : const CircularProgressIndicator(
+                                      strokeWidth: 2))
+                          : Icon(active
+                              ? Icons.stop_rounded
+                              : Icons.volume_up_rounded),
+                      label: Text(active ? 'Stop' : 'Listen · استمع'),
+                    ),
+                  if (note != null)
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(note,
+                          style: const TextStyle(fontSize: 14, color: muted)),
+                    ),
+                ]),
+          );
+        },
+      );
 
   /// Where a library reply came from, under its text. Plain text rather than
   /// links: there is nothing on the phone to open.

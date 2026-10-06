@@ -8,19 +8,23 @@ All AI inference and agent orchestration run on the backend, never on the phone.
 The one model on the phone is the prayer-movement helper's posture classifier,
 which keeps camera frames on the device
 ([`doc/prayer-movement-helper.md`](doc/prayer-movement-helper.md)).
+The voice preview records and plays audio in memory, and all speech
+recognition and synthesis run behind the backend
+([`doc/voice-preview.md`](doc/voice-preview.md)).
 The web target remains a developer preview only.
 
 This is a portable Flutter application source package, intended for adult
 operators using synthetic data only. Warm ivory, teal and orange echo the
-supplied Robert character. No child accounts, consent collection, audio,
+supplied Robert character. No child accounts, consent collection,
 providers, analytics, religious curriculum or production security are
-implemented.
+implemented. Audio exists only in the voice preview, for adult operators in
+development, and nothing of it is kept.
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
-| `lib/` | Application source: `bridge/`, `data/`, `domain/`, `posture/`, `ui/` |
+| `lib/` | Application source: `bridge/`, `data/`, `domain/`, `posture/`, `speech/`, `ui/` |
 | `assets/` | Runtime assets only — the static preview, the shared room backdrop, the Robert character package and `models/prayer_posture.tflite` |
 | `ml/` | `prayer_posture/`: how the posture model is trained and exported, its metrics and its model card. No dataset images |
 | `integration_test/` | Checks that need a device: the bundled posture model on held-out photos |
@@ -193,8 +197,12 @@ Unity.
 
 ## Prepare and run
 
-Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 127 tests
-pass. Dependency versions are recorded in `pubspec.lock`.
+Validated with Flutter 3.47.5 / Dart 3.13.4: analysis is clean and 273 tests
+pass. Dependency versions are recorded in `pubspec.lock`. Besides `http` and
+`uuid`, the app uses `camera` 0.12.1 and `tflite_flutter` 0.12.1 for the
+movement helper, and `record` 7.1.1 and `audioplayers` 6.8.1 for the voice
+preview (`audioplayers` brings `path_provider`, whose Android side builds a
+small native library with CMake).
 
 The SDK is **vendored, not installed**: it lives beside the repositories at
 `../../comp/.tools/flutter` and is not on `PATH`, so `flutter` alone will not
@@ -218,12 +226,16 @@ named `companion`.
 Run `dart format lib test`, `flutter analyze` and `flutter test` after changes.
 
 Android builds succeed: `flutter build apk --debug` and `--release` both
-produce an APK (release 49.3 MB without a Unity export; 125 MB debug with the
-x86_64 export, which is a debug, single-ABI number and not a shipping size), and
-the Kotlin host in `android/app/src/main/kotlin/` compiles into both. The APK
-requests `INTERNET` and, since 2026-10-06, `CAMERA` for the prayer-movement
-helper — no microphone, storage or location permission (the camera plugin's
-`RECORD_AUDIO` and `WRITE_EXTERNAL_STORAGE` are removed from the manifest).
+produce an APK. The current token-free universal release APK with the Unity
+room is 114,394,595 bytes and includes ARM64 and x86_64 native libraries. The
+Kotlin host in `android/app/src/main/kotlin/` compiles into both. The APK
+requests `INTERNET`, `CAMERA` for the prayer-movement helper and, since the
+voice preview, `RECORD_AUDIO` from the `record` plugin. No storage or location
+permission: the camera plugin's `WRITE_EXTERNAL_STORAGE` is removed from the
+manifest, and the camera and microphone are optional hardware. The microphone
+is asked for only when a parent has turned on "Microphone (hold to talk)" and
+the child holds the button. The voice preview remains disabled in the current
+reviewer APK because the speech service is unavailable.
 
 The app has been run on an **Android 16 x86_64 emulator**: the character room
 renders, the bridge handshake completes, an earned colour look sent over the
@@ -236,14 +248,12 @@ device has been used**, so startup, memory, frame time, ARM64, TalkBack,
 keyboard insets and rotation are all still unmeasured, and no performance
 budget has been approved to measure against.
 
-`android/settings.gradle.kts` includes the exported Unity room as
-`:unityLibrary` **only when `unity/export/unityLibrary` exists**, so the app
-still builds without an export and Flutter keeps its static avatar. The module
+`android/settings.gradle.kts` requires the exported Unity room as
+`:unityLibrary`; export it before building the Android app. The module
 reads `unityStreamingAssets` and `unity.*` Gradle properties that live in the
 export's own `gradle.properties`; settings reads them from there rather than
-committing absolute SDK and NDK paths. An export forces `minSdk 25` and, for the
-current x86_64-only export, restricts the app's ABIs to match so the APK cannot
-ship a Flutter ABI with no Unity runtime beside it.
+committing absolute SDK and NDK paths. An export forces `minSdk 25`. The
+export and Flutter APK both include ARM64 and x86_64 so each ABI has Unity.
 
 Release builds shrink with R8. `android/app/proguard-rules.pro` keeps
 `CompanionEventBridge`, which the Unity receiver reaches by name over JNI;
@@ -284,7 +294,9 @@ Connection is user initiated from the connection card on Quests, Style or the
 parent area, or from Talk: until a configured build is connected, a link button
 takes the send button's place in the composer, whose hint asks for a
 connection. Nothing connects automatically. The bootstrap must identify the synthetic development profile,
-disabled voice and awaiting-review content. `features.generativeAnswers` is the
+disabled voice (`features.voice` stays `false`, the release gate's switch) and
+awaiting-review content. It may also carry `features.speech`, the voice
+preview's own switches (see [Voice preview](#voice-preview)). `features.generativeAnswers` is the
 one feature the service may report as on, and it must be a real boolean. The
 app records it and never turns it on, and the parent area shows whether it is
 on. Completion, balance, challenge state, lessons and inventory come from the
@@ -439,9 +451,43 @@ header):
 flutter test integration_test/posture_model_test.dart -d emulator-5554
 ```
 
+## Voice preview
+
+A development preview for adult operators, approved by the product owner on
+2026-10-06 within the backend's development boundary
+([`doc/voice-preview.md`](doc/voice-preview.md)). It is not for children until
+the DPIA and the release gate's voice items are green.
+
+- **Talk:** a Listen button under Robert's replies plays his voice, part by
+  part as the service makes it. With the parent switch on, the send button
+  becomes a hold-to-talk microphone while nothing is typed; what was heard goes
+  into the composer for the child to check and send.
+- **Learn:** four short adhkar to listen to and practise, and the duas of the
+  day with a slot for a recorded human voice.
+- **Quests:** a dhikr game that gives a star, from the server, for each round
+  practised.
+
+Recording is hold-to-talk only, with a red "Listening…" indicator, at most
+15 s and 1 MB, streamed into memory as 16 kHz mono PCM and sent as a WAV built
+in Dart. It stops on release, when the page closes and when the app leaves the
+screen. Practice is never a verdict: the outcome and the feedback line are the
+service's. Nothing of the audio or the transcript is kept.
+
+To try it, start the speech service and the backend with the speech preview
+on, following the backend's "Speech preview — development" section in
+[`../Badr_backend/README.md`](../Badr_backend/README.md) (in short:
+`COMPANION_SPEECH_ENABLED=true`, `COMPANION_SPEECH_URL` and
+`COMPANION_SPEECH_TOKEN`; Robert's voice also needs grounded answers on). Run
+the app with the usual `DEMO_API_URL` and `DEMO_API_TOKEN`, connect, then turn
+on "Microphone (hold to talk)" in the parent area to record. The parent area
+reads "Voice preview: on · development only" when the service has it on.
+
+Build without it with `--dart-define=VOICE=false`: no speech screen, no
+microphone button, no parent switch and no microphone request.
+
 ## Verification coverage and remaining work
 
-The 127-test suite covers no-network default mode, server-owned rewards,
+The suite (273 tests) covers no-network default mode, server-owned rewards,
 ownership rejection, idempotent completion headers, resuming known question
 turns, the bootstrap's grounded-answers flag, polling a pending turn to its
 deadline and resuming it, every turn-contract rule, clearing and disposal
@@ -456,6 +502,14 @@ talk and reactions: talk time from reply length, the talk ending on clear, a
 new question, leaving Talk or a pause, the after-talk cue for every answer
 type, the tap cycle, held celebrations, reduced motion sending nothing, and
 the clip and face allowlists matching the bridge schema.
+
+The voice preview's tests, with a fake microphone, a fake player and a scripted
+service, cover the WAV header, every new payload and its bounds, the build,
+service and parent switches, a refused permission, the recording bounds,
+leaving the app mid-recording, transcripts, Listen's polling and part order,
+practice, the dhikr game to its star and its daily cap, and a scan of every
+preview string for banned and verdict words
+([`doc/voice-preview.md`](doc/voice-preview.md#testing)).
 
 Five of those tests cover the customization tab specifically: that a look is
 earned from the service rather than granted on the device, that the balance is

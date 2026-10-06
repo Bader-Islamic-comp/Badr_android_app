@@ -118,6 +118,18 @@ class RobertCues {
     if (held != null && !_disposed) _sendAll(held);
   }
 
+  /// Robert's voice is reading a reply aloud (the speech preview's Listen):
+  /// he talks for as long as it plays, with the same decorative Talk loop.
+  /// No audio and no text reach the room, only the loop. A reply's own talk
+  /// stops first, without its after-talk cue.
+  void voiceStarted() {
+    quiet();
+    if (!_disposed) room.startTalking();
+  }
+
+  /// Robert's voice stopped: he rests.
+  void voiceEnded() => room.stopTalking();
+
   /// Tapping Robert: a wave, then a giggle, then a wink, and round again. The
   /// cycle only moves on when a cue is accepted, so a tap the bounded queue
   /// refused does not skip one. Returns whether this tap was accepted.

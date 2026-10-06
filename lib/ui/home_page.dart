@@ -8,7 +8,13 @@ import '../bridge/avatar_room.dart';
 import '../data/demo_api.dart';
 import '../domain/companion_controller.dart';
 import '../domain/models.dart';
+import '../speech/robert_voice.dart';
+import '../speech/voice_capture.dart';
+import '../speech/voice_kit.dart';
 import '../theme.dart';
+import 'adhkar_page.dart';
+import 'dhikr_game_page.dart';
+import 'duas_page.dart';
 import 'learn_page.dart';
 import 'parent_sheet.dart';
 import 'quests_page.dart';
@@ -16,6 +22,7 @@ import 'robert_cues.dart';
 import 'style_page.dart';
 import 'talk_page.dart';
 import 'text_direction.dart';
+import 'voice_widgets.dart';
 import 'widgets.dart';
 
 enum CompanionDestination { talk, learn, quests, style }
@@ -24,9 +31,13 @@ enum CompanionDestination { talk, learn, quests, style }
 /// the character room and reply surface, a bottom composer and compact
 /// navigation. Flutter owns every interactive control.
 class CompanionHome extends StatefulWidget {
-  const CompanionHome({super.key, this.controller, this.room, this.startTimer});
+  const CompanionHome(
+      {super.key, this.controller, this.room, this.startTimer, this.voice});
   final CompanionController? controller;
   final AvatarRoom? room;
+
+  /// The speech preview's parts. Tests pass fakes and their own build switch.
+  final VoiceKit? voice;
 
   /// Times how long Robert talks. Tests pass their own so they can end a talk
   /// without waiting on the clock.
@@ -58,6 +69,44 @@ class _CompanionHomeState extends State<CompanionHome>
   /// the camera is never on by default.
   bool movementHelper = false;
 
+  /// Whether a parent has turned on the microphone for the speech preview.
+  /// Off at every start and never saved: nothing records by default.
+  bool microphone = false;
+
+  late final VoiceKit kit = widget.voice ?? const VoiceKit();
+
+  /// Robert reading his reply aloud, on request.
+  late final RobertVoice robertVoice;
+
+  /// The composer's hold-to-talk, made the first time it is shown.
+  VoiceCapture? questionMic;
+  bool transcribing = false;
+
+  /// Which spoken question the composer is waiting for. Leaving Talk, the
+  /// microphone switch going off or the service turning the feature off
+  /// moves it on, and what comes back for an earlier one is dropped.
+  int transcript = 0;
+
+  /// What the composer says about the last spoken question.
+  String? voiceNote;
+
+  /// The language a spoken question is heard in.
+  bool speakArabic = true;
+
+  static const heardCopy =
+      'Check the words, then send them. · تأكّد من الكلمات ثم أرسلها';
+  static const unsureCopy = 'I didn’t catch that. Try again or type it. · '
+      'لم أسمعك جيدًا، جرّب مرة أخرى أو اكتبها';
+  static const writingCopy = 'Writing down what you said…';
+
+  /// What of the speech preview shows: the build, the service and the
+  /// parent's switch together.
+  VoiceAccess get access => VoiceAccess(
+      kit: kit,
+      features: model.speech,
+      connected: model.connected,
+      microphone: microphone);
+
   bool get motionEnabled => motionOverride ?? !platformReducedMotion;
   bool get onCharacterPage => destination == CompanionDestination.talk;
 
@@ -72,6 +121,9 @@ class _CompanionHomeState extends State<CompanionHome>
         CompanionController(DemoApi(DemoConfig.environment()));
     room = widget.room ?? AvatarRoom();
     cues = RobertCues(room, startTimer: widget.startTimer);
+    robertVoice = RobertVoice(model.api, kit,
+        onSpeaking: (speaking) =>
+            speaking ? cues.voiceStarted() : cues.voiceEnded());
     // The room follows the service's record of what is worn, not the tap that
     // changed it: that is also what restores the look after a relaunch or a
     // room rebuild, neither of which involves a tap.
@@ -85,6 +137,17 @@ class _CompanionHomeState extends State<CompanionHome>
   /// Robert stops talking the moment the reply he is talking about goes:
   /// cleared, or replaced when a new question starts.
   void _syncTalk() {
+    // Robert's voice belongs to one reply: a new one, a clear or a service
+    // without the preview ends it.
+    final voiced = robertVoice.turnId;
+    if (voiced != null &&
+        (voiced != model.reply?.turnId || !access.robertVoice)) {
+      unawaited(robertVoice.stop());
+    }
+    if (!access.voiceQuestions) {
+      questionMic?.cancel();
+      _dropTranscript();
+    }
     if (speaking == null || identical(model.reply, speaking)) return;
     speaking = null;
     cues.quiet();
@@ -123,7 +186,11 @@ class _CompanionHomeState extends State<CompanionHome>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final foreground = state == AppLifecycleState.resumed;
-    if (!foreground) cues.backgrounded();
+    if (!foreground) {
+      // Robert's voice stops with the app; a recording drops itself.
+      unawaited(robertVoice.stop());
+      cues.backgrounded();
+    }
     room.setForeground(foreground);
   }
 
@@ -133,6 +200,8 @@ class _CompanionHomeState extends State<CompanionHome>
     model.removeListener(_syncCosmetic);
     room.removeListener(_syncCosmetic);
     model.removeListener(_syncTalk);
+    robertVoice.dispose();
+    questionMic?.dispose();
     cues.dispose();
     question.dispose();
     if (widget.controller == null) model.dispose();
@@ -145,7 +214,12 @@ class _CompanionHomeState extends State<CompanionHome>
     final talk = value == CompanionDestination.talk;
     // Ended while the room is still resumed, so the room accepts it; the
     // bridge would also end a talk on the pause that follows.
-    if (!talk) cues.quiet();
+    if (!talk) {
+      unawaited(robertVoice.stop());
+      questionMic?.cancel();
+      _dropTranscript();
+      cues.quiet();
+    }
     await room.setOnCharacterPage(talk);
     if (talk && mounted && destination == CompanionDestination.talk) {
       cues.characterShown();
@@ -170,9 +244,82 @@ class _CompanionHomeState extends State<CompanionHome>
     if (celebrated) cues.orientationCompleted();
   }
 
+  void _setMicrophone(bool value) {
+    setState(() => microphone = value);
+    if (!value) {
+      questionMic?.cancel();
+      _dropTranscript();
+      voiceNote = null;
+    }
+  }
+
+  /// Whatever is still being written down is not put in the composer: the
+  /// child has moved on. The model's or the page's own rebuild shows it.
+  void _dropTranscript() {
+    transcript++;
+    transcribing = false;
+  }
+
+  void _push(Widget page) =>
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+
+  void _openStyle() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    _select(CompanionDestination.style);
+  }
+
+  /// The composer's microphone, for the service's current bound.
+  VoiceCapture get _questionMic {
+    final existing = questionMic;
+    if (existing != null && existing.maxSeconds == access.maxSeconds) {
+      return existing;
+    }
+    existing?.dispose();
+    return questionMic = VoiceCapture(
+        recorder: kit.recorder,
+        maxSeconds: access.maxSeconds,
+        onRecorded: _transcribe);
+  }
+
+  /// Sends a spoken question to be written down, and puts what was heard in
+  /// the composer for the child to check and send. Nothing is sent to Robert
+  /// until they do.
+  Future<void> _transcribe(Uint8List wav) async {
+    if (!mounted) return;
+    final session = ++transcript;
+    bool current() => mounted && session == transcript;
+    setState(() {
+      transcribing = true;
+      voiceNote = null;
+    });
+    try {
+      final heard =
+          await model.api.transcribe(wav, language: speakArabic ? 'ar' : 'en');
+      if (!current()) return;
+      final text = heard.text;
+      if (text == null) {
+        voiceNote = unsureCopy;
+      } else {
+        final before = question.text.trim();
+        var combined = before.isEmpty ? text : '$before $text';
+        if (combined.length > 1000) combined = combined.substring(0, 1000);
+        question.value = TextEditingValue(
+            text: combined,
+            selection: TextSelection.collapsed(offset: combined.length));
+        voiceNote = heardCopy;
+      }
+    } on DemoApiException catch (error) {
+      if (current()) voiceNote = error.message;
+    } finally {
+      if (current()) setState(() => transcribing = false);
+    }
+  }
+
   Future<void> _ask() async {
     // A new question: whatever Robert was saying about the last reply stops.
     speaking = null;
+    unawaited(robertVoice.stop());
+    voiceNote = null;
     cues.quiet();
     final released = await model.ask(question.text);
     if (!mounted) return;
@@ -317,6 +464,8 @@ class _CompanionHomeState extends State<CompanionHome>
                     movementHelper: movementHelper,
                     onMovementHelperChanged: (value) =>
                         setState(() => movementHelper = value),
+                    voice: access,
+                    onMicrophoneChanged: _setMicrophone,
                   ),
               icon: const Icon(Icons.shield_outlined)),
         ]),
@@ -330,6 +479,11 @@ class _CompanionHomeState extends State<CompanionHome>
             onTapCharacter: () {
               cues.tapped();
             },
+            voice: access.robertVoice ? robertVoice : null,
+            voiceStrip: switch (_composerMic) {
+              final mic? => _voiceStrip(mic),
+              null => null,
+            },
           ),
         CompanionDestination.learn => LearnPage(
             model: model,
@@ -337,8 +491,20 @@ class _CompanionHomeState extends State<CompanionHome>
             onStep: (value) => setState(() => lessonStep = value),
             onFinish: _finishOrientation,
             movementHelper: movementHelper,
+            onOpenAdhkar: access.preview
+                ? () => _push(AdhkarPage(api: model.api, access: access))
+                : null,
+            onOpenDuas: access.preview
+                ? () => _push(DuasPage(api: model.api, access: access))
+                : null,
           ),
-        CompanionDestination.quests => QuestsPage(model: model),
+        CompanionDestination.quests => QuestsPage(
+            model: model,
+            onOpenGame: access.recitation
+                ? () => _push(DhikrGamePage(
+                    model: model, access: access, onOpenStyle: _openStyle))
+                : null,
+          ),
         CompanionDestination.style => StylePage(
             model: model,
             onEarned: cues.lookEarned,
@@ -358,49 +524,60 @@ class _CompanionHomeState extends State<CompanionHome>
         const CopySelectionTextIntent.cut(SelectionChangedCause.keyboard),
   };
 
-  Widget _composer() => Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        color: room.surfaceAttached ? ivoryScrim : Colors.transparent,
-        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Expanded(
-            // An Arabic question is typed right to left, like its reply.
-            child: ValueListenableBuilder<TextEditingValue>(
-              valueListenable: question,
-              builder: (context, value, _) => TextField(
-                controller: question,
-                textDirection: directionOf(value.text),
-                maxLength: 1000,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                enabled: !model.busy && !model.canRetryQuestion,
-                onSubmitted: (_) => model.busy ? null : _ask(),
-                decoration: InputDecoration(
-                  counterText: '',
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  // Friendly, but still says the text is for testing: this is a
-                  // development build and nothing real belongs in it. Kept short
-                  // so that at 320 px and 2× text it wraps less than the old
-                  // hint did, not more.
-                  hintText: !model.connected
-                      ? 'Connect the development service to ask'
-                      : model.unreviewedDrafts
-                          ? 'Ask the draft corpus (adults only)'
-                          : 'Say hi or ask (test text only)',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(999),
-                      borderSide: const BorderSide(color: hairline)),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(999),
-                      borderSide: const BorderSide(color: hairline)),
-                ),
+  /// The composer's microphone, when a question can be asked out loud here.
+  VoiceCapture? get _composerMic =>
+      access.voiceQuestions && !_connectsHere ? _questionMic : null;
+
+  Widget _composer() {
+    final mic = _composerMic;
+    final canSpeak = !model.busy && !model.canRetryQuestion && !transcribing;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      color: room.surfaceAttached ? ivoryScrim : Colors.transparent,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Expanded(
+          // An Arabic question is typed right to left, like its reply.
+          child: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: question,
+            builder: (context, value, _) => TextField(
+              controller: question,
+              textDirection: directionOf(value.text),
+              maxLength: 1000,
+              minLines: 1,
+              maxLines: 4,
+              textInputAction: TextInputAction.send,
+              enabled: !model.busy && !model.canRetryQuestion,
+              onSubmitted: (_) => model.busy ? null : _ask(),
+              decoration: InputDecoration(
+                counterText: '',
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                // Friendly, but still says the text is for testing: this is a
+                // development build and nothing real belongs in it. Kept short
+                // so that at 320 px and 2× text it wraps less than the old
+                // hint did, not more.
+                hintText: !model.connected
+                    ? 'Connect the development service to ask'
+                    : model.unreviewedDrafts
+                        ? 'Ask the draft corpus (adults only)'
+                        : 'Say hi or ask (test text only)',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: const BorderSide(color: hairline)),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: const BorderSide(color: hairline)),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          SizedBox(
+        ),
+        const SizedBox(width: 10),
+        // With the microphone on and nothing typed, the button is the
+        // microphone: there is nothing to send yet. Typing brings Send back.
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: question,
+          builder: (context, value, _) => SizedBox(
             width: 52,
             height: 52,
             child: _connectsHere
@@ -409,17 +586,82 @@ class _CompanionHomeState extends State<CompanionHome>
                     onPressed: model.busy ? null : model.connect,
                     icon: const Icon(Icons.link_rounded),
                   )
-                : IconButton.filled(
-                    tooltip: model.canRetryQuestion
-                        ? 'Retry the same request'
-                        : 'Send test question',
-                    onPressed: model.busy ? null : _ask,
-                    icon: Icon(model.canRetryQuestion
-                        ? Icons.refresh_rounded
-                        : Icons.arrow_upward_rounded),
-                  ),
+                : mic != null &&
+                        value.text.trim().isEmpty &&
+                        !model.canRetryQuestion
+                    ? HoldToTalkButton(
+                        capture: mic,
+                        enabled: canSpeak,
+                        label: 'Hold to ask Robert out loud',
+                        onPress: () {
+                          unawaited(robertVoice.stop());
+                          setState(() => voiceNote = null);
+                        },
+                      )
+                    : IconButton.filled(
+                        tooltip: model.canRetryQuestion
+                            ? 'Retry the same request'
+                            : 'Send test question',
+                        onPressed: model.busy ? null : _ask,
+                        icon: Icon(model.canRetryQuestion
+                            ? Icons.refresh_rounded
+                            : Icons.arrow_upward_rounded),
+                      ),
           ),
-        ]),
+        ),
+      ]),
+    );
+  }
+
+  /// Just above the composer, at the foot of Talk, while the microphone is
+  /// on: the listening indicator while held, then what happened to the
+  /// question, and beside it the language a question is heard in.
+  Widget _voiceStrip(VoiceCapture mic) => ListenableBuilder(
+        listenable: mic,
+        builder: (context, _) {
+          final Widget line = mic.listening
+              ? ListeningIndicator(capture: mic)
+              : transcribing
+                  ? const Row(mainAxisSize: MainAxisSize.min, children: [
+                      SizedBox.square(
+                          dimension: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 10),
+                      Flexible(child: Text(writingCopy)),
+                    ])
+                  : Row(children: [
+                      _languageToggle(),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: mic.problem != null
+                              ? VoiceNote(mic.problem!)
+                              : voiceNote != null
+                                  ? VoiceNote(voiceNote!)
+                                  : const SizedBox.shrink()),
+                    ]);
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 16, 0),
+            child: Align(alignment: Alignment.centerLeft, child: line),
+          );
+        },
+      );
+
+  /// The language a spoken question is heard in: Arabic unless changed.
+  Widget _languageToggle() => Semantics(
+        button: true,
+        label: speakArabic
+            ? 'Speaking Arabic. Tap for English.'
+            : 'Speaking English. Tap for Arabic.',
+        excludeSemantics: true,
+        child: OutlinedButton(
+          onPressed: () => setState(() => speakArabic = !speakArabic),
+          style: OutlinedButton.styleFrom(
+              minimumSize: const Size(48, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              visualDensity: VisualDensity.compact),
+          child: Text(speakArabic ? 'ع' : 'EN',
+              style: const TextStyle(fontWeight: FontWeight.w800)),
+        ),
       );
 
   /// A configured build that is not connected yet connects from the composer:

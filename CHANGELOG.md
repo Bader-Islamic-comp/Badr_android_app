@@ -6,6 +6,59 @@ Development increments, newest first. Nothing here is a release: the gates in
 Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
 `contracts/` must stay byte-identical between the two repositories.
 
+## Unreleased — 2026-10-06 (voice preview)
+
+### Added
+
+- **A voice preview, for adult operators in development** (`doc/voice-preview.md`). The product owner approved
+  it on 2026-10-06 within the backend's development boundary. It is not for children until the DPIA and the
+  release gate's voice items are green.
+  - **Talk:** Listen under Robert's replies. The app asks the backend for his voice, reads its state every 2 s
+    for up to 5 minutes, and plays the parts in order as they are ready, with his usual Talk loop. Never for a
+    safeguarding reply. Parts the backend dropped or lost are skipped.
+  - **Talk, out loud:** with the parent switch on and nothing typed, the send button becomes a hold-to-talk
+    microphone. What was heard goes into the composer to check and send; an unsure answer says "I didn't
+    catch that. Try again or type it." Arabic by default, English on a tap.
+  - **Learn:** an Adhkar page (takbeer, tasbeeh, tahmeed, istighfar) with Listen and Practise, and a Duas page
+    with each dua's note, a slot for a recorded human voice ("A recorded voice is coming") and practice part by
+    part where the backend has verified parts.
+  - **Quests:** a dhikr game. A round has three counted tries; a finished round shows "+1 star", the balance is
+    read again from the server, and "See looks in Style" opens Style. When the day's game stars are given, it
+    says so warmly and still plays. No timers, streaks or rankings.
+  - Practice is never a verdict. The outcome, the words to mark and the feedback line are the backend's. The
+    app's own copy avoids the banned words and never calls a recitation correct, valid or accepted.
+- **Recording and playback in memory** (`lib/speech/`).
+  - Hold-to-talk only, with a red dot and "Listening… 3 s". PCM16, mono, 16 kHz, streamed into memory; the WAV
+    header is built in Dart. At most 15 s (the backend's `maxRecordingSeconds`, never over 30) and 1 MB. It
+    stops on release, when the page closes and when the app leaves the screen, and the bytes are cleared after
+    the request. Android's permission prompt is waited out: a refusal says so, and after a yes the app says "The
+    microphone is ready. Now hold to talk."
+  - Playback from bytes in memory. On iOS, macOS and Linux the player plugin would write a temporary file, so
+    there the app does not play.
+  - Behind small interfaces (`VoiceRecorder`, `AudioPlayback`) with fakes for the tests.
+- **Controls.** `--dart-define=VOICE=false` builds without any of it. The backend's `features.speech` switches
+  each part. The parent area's "Microphone (hold to talk)" is off at every start, is not saved, and is needed
+  for every recording; listening needs no switch.
+- **Requests** (`lib/data/demo_api.dart`): raw `audio/wav` uploads (75 s timeout for the backend's worst case, 1 MB
+  bound, keys for writes and none for a transcription), WAV downloads (40 s timeout) checked for their header, and
+  strict parsing of every new payload (`lib/domain/speech_models.dart`). The backend's speech error codes get gentle
+  wording; any other error stays generic.
+- **Tests.** 90 new tests: the WAV header, every new payload, the requests, each page with a fake microphone,
+  player and service, and a scan of every preview string for banned and verdict words. 273 tests pass and
+  `flutter analyze` is clean. Nothing was built for Android or run on a device: there is no Android SDK in
+  this environment.
+
+### Changed
+
+- **The bootstrap reads `features.speech`.** `features.voice`, the release gate's switch, must still be
+  `false`. A `features.speech` the app cannot read refuses the service like any other unexpected bootstrap.
+- **Permissions:** `RECORD_AUDIO` now comes through from the `record` plugin; it was removed from the merged
+  manifest before. `WRITE_EXTERNAL_STORAGE` stays removed. The microphone is optional hardware.
+- **New dependencies:** `record` 7.1.1 and `audioplayers` 6.8.1. `audioplayers` brings `path_provider`.
+- A 2xx answer that is not JSON now reads "The service returned an unexpected response." rather than
+  "Connection unavailable".
+- `AGENTS.md` names the voice preview as the one approved microphone and audio feature.
+
 ## Unreleased — 2026-10-06 (feature/cv-prayer-classifier)
 
 ### Added

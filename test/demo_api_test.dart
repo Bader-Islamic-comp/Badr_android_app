@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:companion_mobile/data/demo_api.dart';
+import 'package:companion_mobile/domain/speech_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -99,8 +100,11 @@ void main() {
           'generativeAnswers': grounded,
           'unity': false,
         }));
-        expect(await api.bootstrap(),
-            (groundedAnswers: grounded, unreviewedDrafts: false));
+        expect(await api.bootstrap(), (
+          groundedAnswers: grounded,
+          unreviewedDrafts: false,
+          speech: SpeechFeatures.off,
+        ));
         api.close();
       }
     });
@@ -115,8 +119,11 @@ void main() {
         }),
         'contentStatus': 'unreviewed_drafts',
       });
-      expect(await api.bootstrap(),
-          (groundedAnswers: true, unreviewedDrafts: true));
+      expect(await api.bootstrap(), (
+        groundedAnswers: true,
+        unreviewedDrafts: true,
+        speech: SpeechFeatures.off,
+      ));
       api.close();
     });
 

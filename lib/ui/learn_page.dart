@@ -13,6 +13,8 @@ class LearnPage extends StatelessWidget {
     required this.onStep,
     required this.onFinish,
     this.movementHelper = false,
+    this.onOpenAdhkar,
+    this.onOpenDuas,
   });
 
   final CompanionController model;
@@ -23,6 +25,11 @@ class LearnPage extends StatelessWidget {
   /// Whether a parent has turned on the movement helper, which lets the
   /// prayer-movement practice use the camera.
   final bool movementHelper;
+
+  /// Open the speech preview's adhkar and duas. Null hides them: the build,
+  /// or the service, does not offer the preview.
+  final VoidCallback? onOpenAdhkar;
+  final VoidCallback? onOpenDuas;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +70,50 @@ class LearnPage extends StatelessWidget {
             ),
           ]),
         ),
+        if (onOpenAdhkar != null) ...[
+          const SizedBox(height: 16),
+          Panel(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.record_voice_over_outlined,
+                  size: 32, color: teal),
+              const SizedBox(height: 12),
+              Text('Adhkar · أذكار',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              const Text('Listen to four short adhkar and practise saying '
+                  'them. Practice helps your pronunciation.'),
+              const SizedBox(height: 16),
+              _action(
+                label: 'Open adhkar',
+                hint: 'Opens the adhkar to listen and practise',
+                onPressed: onOpenAdhkar,
+              ),
+            ]),
+          ),
+        ],
+        if (onOpenDuas != null) ...[
+          const SizedBox(height: 16),
+          Panel(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.volunteer_activism_outlined,
+                  size: 32, color: teal),
+              const SizedBox(height: 12),
+              Text('Duas · أدعية',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              const Text('Duas for the day, each with a note for you, and '
+                  'a recorded voice once one is ready.'),
+              const SizedBox(height: 16),
+              _action(
+                label: 'Open duas',
+                hint: 'Opens the list of duas',
+                onPressed: onOpenDuas,
+              ),
+            ]),
+          ),
+        ],
         const SizedBox(height: 16),
         const Panel(
           child:

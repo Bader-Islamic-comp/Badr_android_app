@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../bridge/avatar_room.dart';
 import '../domain/companion_controller.dart';
 import '../posture/posture_source.dart';
+import '../speech/voice_kit.dart';
 import 'character_stage.dart';
 import 'widgets.dart';
 
@@ -14,6 +15,8 @@ Future<void> showParentSheet(
   required ValueChanged<bool> onMotionChanged,
   bool movementHelper = false,
   ValueChanged<bool>? onMovementHelperChanged,
+  VoiceAccess? voice,
+  ValueChanged<bool>? onMicrophoneChanged,
 }) =>
     showModalBottomSheet<void>(
       context: context,
@@ -26,6 +29,8 @@ Future<void> showParentSheet(
         onMotionChanged: onMotionChanged,
         movementHelper: movementHelper,
         onMovementHelperChanged: onMovementHelperChanged ?? (_) {},
+        voice: voice,
+        onMicrophoneChanged: onMicrophoneChanged ?? (_) {},
       ),
     );
 
@@ -37,6 +42,8 @@ class _ParentSheet extends StatefulWidget {
     required this.onMotionChanged,
     required this.movementHelper,
     required this.onMovementHelperChanged,
+    required this.voice,
+    required this.onMicrophoneChanged,
   });
 
   final CompanionController model;
@@ -46,6 +53,10 @@ class _ParentSheet extends StatefulWidget {
   final bool movementHelper;
   final ValueChanged<bool> onMovementHelperChanged;
 
+  /// The speech preview, or null when the shell does not offer it.
+  final VoiceAccess? voice;
+  final ValueChanged<bool> onMicrophoneChanged;
+
   @override
   State<_ParentSheet> createState() => _ParentSheetState();
 }
@@ -53,6 +64,11 @@ class _ParentSheet extends StatefulWidget {
 class _ParentSheetState extends State<_ParentSheet> {
   late bool motionEnabled = widget.motionEnabled;
   late bool movementHelper = widget.movementHelper;
+  late bool microphone = widget.voice?.microphone ?? false;
+
+  /// The switch shows only when this build carries the preview and the
+  /// connected service has it on.
+  bool get _voicePreview => widget.voice?.preview ?? false;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -115,12 +131,40 @@ class _ParentSheetState extends State<_ParentSheet> {
                   ),
                 ),
                 const Divider(height: 32),
-                const ListTile(
+                if (_voicePreview) ...[
+                  const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.record_voice_over_outlined),
+                      title: Text('Voice preview: on · development only'),
+                      subtitle: Text(
+                          'The development service offers Robert’s voice, '
+                          'adhkar and dua practice, and spoken questions, for '
+                          'adult testing only. It is not ready for children.')),
+                  SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.mic_off_outlined),
-                    title: Text('Voice is off'),
-                    subtitle:
-                        Text('No microphone access or audio collection.')),
+                    value: microphone,
+                    onChanged: (value) {
+                      setState(() => microphone = value);
+                      widget.onMicrophoneChanged(value);
+                    },
+                    secondary: Icon(microphone
+                        ? Icons.mic_none_rounded
+                        : Icons.mic_off_outlined),
+                    title: const Text('Microphone (hold to talk)'),
+                    subtitle: const Text(
+                        'Lets a button be held to speak: to practise adhkar '
+                        'and duas, and to ask Robert out loud. Sound is '
+                        'recorded only while the button is held, sent to the '
+                        'development service, and kept nowhere on this phone. '
+                        'Off at every start.'),
+                  ),
+                ] else
+                  const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.mic_off_outlined),
+                      title: Text('Voice is off'),
+                      subtitle:
+                          Text('No microphone access or audio collection.')),
                 if (postureHelperBuilt)
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
