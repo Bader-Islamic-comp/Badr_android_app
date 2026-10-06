@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:companion_mobile/speech/audio_playback.dart';
 import 'package:companion_mobile/speech/voice_recorder.dart';
 import 'package:companion_mobile/speech/wav.dart';
@@ -105,6 +106,58 @@ class FakePlayback implements AudioPlayback {
 
   @override
   Future<void> dispose() async => finish();
+}
+
+/// The `audioplayers` player as [AudioPlayersPlayback] uses it, with no
+/// platform behind it. Like the plugin, it reports `stopped` after a stop
+/// and `completed` only when told ([complete]). Android's own pause for a
+/// lost audio focus reaches Dart as nothing at all, which is what a test gets
+/// by doing nothing.
+class FakeAudioPlayer implements AudioPlayer {
+  final _states = StreamController<PlayerState>.broadcast();
+  final _events = StreamController<AudioEvent>.broadcast();
+  int plays = 0;
+  int stops = 0;
+  bool disposed = false;
+
+  @override
+  Stream<PlayerState> get onPlayerStateChanged => _states.stream;
+
+  @override
+  Stream<AudioEvent> get eventStream => _events.stream;
+
+  @override
+  Future<void> play(Source source,
+      {double? volume,
+      double? balance,
+      AudioContext? ctx,
+      Duration? position,
+      PlayerMode? mode}) async {
+    plays++;
+    _states.add(PlayerState.playing);
+  }
+
+  @override
+  Future<void> stop() async {
+    stops++;
+    _states.add(PlayerState.stopped);
+  }
+
+  /// A state the plugin reports, as if from the platform.
+  void report(PlayerState state) => _states.add(state);
+
+  /// The audio reached its end.
+  void complete() => _states.add(PlayerState.completed);
+
+  @override
+  Future<void> dispose() async {
+    disposed = true;
+    unawaited(_states.close());
+    unawaited(_events.close());
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /// A tiny WAV whose samples are all [marker], so a fake player can tell which

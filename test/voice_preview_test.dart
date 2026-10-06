@@ -9,6 +9,7 @@ import 'package:companion_mobile/domain/companion_controller.dart';
 import 'package:companion_mobile/domain/models.dart';
 import 'package:companion_mobile/domain/speech_models.dart';
 import 'package:companion_mobile/main.dart';
+import 'package:companion_mobile/speech/audio_playback.dart';
 import 'package:companion_mobile/speech/robert_voice.dart';
 import 'package:companion_mobile/speech/voice_capture.dart';
 import 'package:companion_mobile/speech/voice_kit.dart';
@@ -703,6 +704,169 @@ void main() {
       expect(find.text(_listen), findsOneWidget, reason: 'ready to replay');
       expect(host.cues.last, 'Standing');
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    /// A room over a fake host, to see Robert's talk cue.
+    ({FakeUnityHost host, AvatarRoom room}) roomFor(String name) {
+      final host = FakeUnityHost(name)..install();
+      addTearDown(host.remove);
+      final room = AvatarRoom(
+        commands: host.commands,
+        create: () => AvatarBridge(
+            commands: host.commands,
+            events: host.events,
+            timeout: const Duration(seconds: 30)),
+      );
+      addTearDown(room.dispose);
+      return (host: host, room: room);
+    }
+
+    /// Robert's voice for turn-1 is one ready part.
+    Future<http.Response> onePart(http.Request request) async =>
+        switch (request.url.path) {
+          '/v1/turns/turn-1/speech' => jsonResponse({
+              'status': 'ready',
+              'parts': [
+                {'index': 0, 'ready': true}
+              ],
+              'reason': null,
+            }, status: 202),
+          '/v1/turns/turn-1/speech/parts/0' => wavResponse(10),
+          _ => http.Response('{}', 404),
+        };
+
+    testWidgets(
+        'a part the phone paused without a word (audio focus taken) ends, '
+        'and Robert stops talking', (tester) async {
+      _phone(tester);
+      final (:host, :room) = roomFor('test/voice_focus');
+      final player = FakeAudioPlayer();
+      final model = _connected(onePart);
+      await tester.pumpWidget(CompanionApp(
+          controller: model,
+          room: room,
+          voice: VoiceKit(
+              recorder: FakeRecorder.new,
+              playback: () => AudioPlayersPlayback(player: () => player))));
+      await tester.pumpAndSettle();
+      await _flush(tester);
+
+      await tester.tap(find.text(_listen));
+      await _flush(tester);
+      expect(player.plays, 1);
+      expect(find.text(TalkPage.speakingCopy), findsOneWidget);
+      expect(host.cues.last, 'Talk');
+
+      // Another app took the audio focus for good: Android paused the player
+      // and the plugin said nothing.
+      await tester.pump(const Duration(seconds: 4));
+      await _flush(tester);
+      expect(find.text(TalkPage.speakingCopy), findsNothing);
+      expect(host.cues.last, 'Standing');
+      expect(find.text(_listen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets('leaving the app while Robert speaks stops his voice and cue',
+        (tester) async {
+      _phone(tester);
+      final (:host, :room) = roomFor('test/voice_leave');
+      final playback = FakePlayback(hold: true);
+      final model = _connected(onePart);
+      await tester.pumpWidget(CompanionApp(
+          controller: model, room: room, voice: _kit(playback: playback)));
+      await tester.pumpAndSettle();
+      await _flush(tester);
+      await tester.tap(find.text(_listen));
+      await _flush(tester);
+      expect(playback.playing, isTrue);
+      expect(host.cues.last, 'Talk');
+
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await _flush(tester);
+      expect(playback.playing, isFalse);
+      expect(playback.stops, greaterThan(0));
+      expect(host.cues.sublist(host.cues.lastIndexOf('Talk')),
+          containsAllInOrder(['Talk', 'Standing', 'pause']),
+          reason: 'the talk cue ends before the room pauses');
+
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await _flush(tester);
+      expect(find.text(TalkPage.speakingCopy), findsNothing);
+      expect(find.text(_listen), findsOneWidget);
+      expect(playback.played, [10], reason: 'nothing starts again by itself');
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets('a double tap on Listen plays the voice once', (tester) async {
+      _phone(tester);
+      final playback = FakePlayback(hold: true);
+      final requests = <String>[];
+      final model = _connected((request) {
+        requests.add('${request.method} ${request.url.path}');
+        return onePart(request);
+      });
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(playback: playback)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_listen));
+      await tester.tap(find.text(_listen), warnIfMissed: false);
+      await _flush(tester);
+      expect(playback.played, [10]);
+      expect(requests.where((r) => r.endsWith('/parts/0')), hasLength(1));
+      expect(find.text(TalkPage.speakingCopy), findsOneWidget);
+      playback.finish();
+      await _flush(tester);
+      expect(find.text(_listen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets(
+        'Robert’s voice switched off since connecting reads as no voice',
+        (tester) async {
+      _phone(tester);
+      final model =
+          _connected((_) async => errorResponse(404, 'speech_disabled'));
+      await tester.pumpWidget(CompanionApp(controller: model, voice: _kit()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_listen));
+      await _flush(tester);
+      expect(find.text(TalkPage.unavailableCopy), findsOneWidget);
+      expect(find.text(DemoApi.knownErrors['speech_disabled']!), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets('a reply still being finished says so, and Listen stays',
+        (tester) async {
+      _phone(tester);
+      final model = _connected((_) async => errorResponse(409, 'turn_pending'));
+      await tester.pumpWidget(CompanionApp(controller: model, voice: _kit()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_listen));
+      await _flush(tester);
+      expect(find.text(DemoApi.knownErrors['turn_pending']!), findsOneWidget);
+      expect(find.text(_listen), findsOneWidget,
+          reason: 'it can be tried again');
       await tester.pumpWidget(const SizedBox());
       model.dispose();
     });
