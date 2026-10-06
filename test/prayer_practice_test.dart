@@ -5,6 +5,7 @@ import 'package:companion_mobile/posture/movement_practice.dart';
 import 'package:companion_mobile/posture/posture.dart';
 import 'package:companion_mobile/posture/posture_source.dart';
 import 'package:companion_mobile/theme.dart';
+import 'package:companion_mobile/ui/posture_figure.dart';
 import 'package:companion_mobile/ui/prayer_practice_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,15 +82,72 @@ void main() {
 
     for (final step in practiceSteps) {
       expect(find.text(step.title), findsOneWidget);
+      expect(tester.widget<PostureFigure>(find.byType(PostureFigure)).pose,
+          step.figure);
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
     }
     expect(find.text('All 7 movements practised'), findsOneWidget);
+    expect(find.byType(PostureFigure), findsNothing);
     expect(find.textContaining('helper saw'), findsNothing);
     await tester.tap(find.text('Practise again'));
     await tester.pumpAndSettle();
     expect(find.text('Stand'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('each step shows its drawing, standing up again its own',
+      (tester) async {
+    expect([
+      for (final step in practiceSteps) step.figure
+    ], [
+      FigurePose.qiyam,
+      FigurePose.ruku,
+      FigurePose.itidal,
+      FigurePose.sujud,
+      FigurePose.julus,
+      FigurePose.sujud,
+      FigurePose.julus,
+    ]);
+    final handle = tester.ensureSemantics();
+    await _open(tester, const PrayerPracticePage(helperAllowed: false));
+    expect(find.bySemanticsLabel('Drawing of standing'), findsOneWidget);
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Drawing of bowing'), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('the practice fits a narrow screen with large text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(MaterialApp(
+        theme: companionTheme(),
+        home: const PrayerPracticePage(helperAllowed: false)));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    for (final step in practiceSteps) {
+      // The card is taller than the screen here, so its top may have
+      // scrolled away by now.
+      expect(find.text(step.title, skipOffstage: false), findsOneWidget);
+      final figure = find.byType(PostureFigure, skipOffstage: false);
+      await tester.ensureVisible(figure);
+      await tester.pumpAndSettle();
+      expect(tester.getSize(figure).height, 180);
+      expect(tester.getSize(figure).width, lessThanOrEqualTo(320));
+      await tester.ensureVisible(find.text('Next', skipOffstage: false));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+    expect(find.text('All 7 movements practised'), findsOneWidget);
   });
 
   testWidgets('the camera starts only when asked, and the helper moves on',

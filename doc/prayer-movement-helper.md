@@ -77,6 +77,34 @@ front camera (low resolution, no audio)
   madhhab, and the helper does not look at hand positions or other details
   where practice differs.
 
+## Pictures
+
+Each step shows a line drawing of its posture (`lib/ui/posture_figure.dart`):
+a child in a robe and cap on a prayer mat, seen from the side, in the app's ink.
+
+- **No face**, so it stands for any child.
+- **Drawn in code,** so nothing is downloaded and the drawings stay sharp at
+  any size. The PNGs in `test/goldens/` and `design/prayer-postures.png` are
+  rendered from that same code by `test/posture_figure_test.dart`.
+
+![The five drawings](../design/prayer-postures.png)
+
+Five drawings cover the seven steps:
+- standing with the hands folded (qiyam);
+- standing with the arms at the sides (rising from the bow);
+- bowing;
+- prostrating;
+- sitting.
+
+They show the posture only. Where the schools differ, the drawings stay plain:
+- the hands are one simple shape at the waist;
+- the feet are hidden when sitting;
+- in prostration the hand lies between the shoulder and the head.
+
+The folded hands in the first standing follow the reference picture the
+product owner gave. The Maliki practice of letting the arms hang is not shown.
+The drawings go to the scholarly reviewer with the step names.
+
 ## The model
 
 `ml/prayer_posture/MODEL_CARD.md` covers the data, licences, results and limits.
@@ -128,8 +156,8 @@ In short:
 
 ## Open
 
-- The step names await the scholarly reviewer, like the rest of the religious
-  content.
+- The step names and the drawings await the scholarly reviewer, like the rest
+  of the religious content.
 - If the team wants this decision under the signed governance of
   `comp-server/doc/decisions/`, it can be recorded there as a policy decision.
 - The parent switch should be saved with the other guardian settings once those

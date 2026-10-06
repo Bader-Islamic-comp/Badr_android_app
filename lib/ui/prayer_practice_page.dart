@@ -8,6 +8,7 @@ import '../posture/posture.dart';
 import '../posture/posture_smoother.dart';
 import '../posture/posture_source.dart';
 import '../theme.dart';
+import 'posture_figure.dart';
 import 'widgets.dart';
 
 /// Practising the prayer movements, one step at a time.
@@ -174,6 +175,8 @@ class _PrayerPracticePageState extends State<PrayerPracticePage>
       Text(step.arabic,
           textDirection: TextDirection.rtl,
           style: const TextStyle(fontSize: 20, color: ink)),
+      const SizedBox(height: 16),
+      _FigurePlate(step.figure),
       if (practice.index > 0 && practice.lastByHelper) ...[
         const SizedBox(height: 12),
         const Text('The helper saw your last movement. Well done!',
@@ -252,6 +255,24 @@ class _PrayerPracticePageState extends State<PrayerPracticePage>
               label: Text(starting ? 'Starting…' : 'Turn on the camera')),
     ]);
   }
+}
+
+/// The drawing of the movement to make, on its own soft surface so the white
+/// figure stands apart from the white card. Its height is fixed so the card
+/// keeps its shape from one step to the next.
+class _FigurePlate extends StatelessWidget {
+  const _FigurePlate(this.pose);
+
+  final FigurePose pose;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        height: 180,
+        decoration: BoxDecoration(
+            color: ivory, borderRadius: BorderRadius.circular(16)),
+        child: PostureFigure(pose: pose),
+      );
 }
 
 /// Always visible while the camera runs, so nobody has to guess.

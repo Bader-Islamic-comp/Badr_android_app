@@ -1,27 +1,35 @@
 import 'package:flutter/foundation.dart';
 
+import 'figure_pose.dart';
 import 'posture.dart';
 
-/// One step of the practice: the posture to take and what it is called.
+/// One step of the practice: the posture to take, what it is called and the
+/// drawing that shows it.
 class PracticeStep {
-  const PracticeStep(this.posture, this.title, this.arabic);
+  const PracticeStep(this.posture, this.title, this.arabic, this.figure);
 
   final Posture posture;
   final String title;
   final String arabic;
+
+  /// The drawing on the step's card. Rising from the bow is standing to the
+  /// helper, but it has its own drawing with the arms at the sides.
+  final FigurePose figure;
 }
 
 /// Practising the movements of one rak'ah, in order. Movement names only: no
 /// recitation, no rulings. The wording awaits the scholarly reviewer like the
 /// rest of the religious content (`doc/prayer-movement-helper.md`).
 const practiceSteps = [
-  PracticeStep(Posture.qiyam, 'Stand', 'القيام'),
-  PracticeStep(Posture.ruku, 'Bow', 'الركوع'),
-  PracticeStep(Posture.qiyam, 'Stand up again', 'الرفع من الركوع'),
-  PracticeStep(Posture.sujud, 'Prostrate', 'السجود'),
-  PracticeStep(Posture.julus, 'Sit', 'الجلوس بين السجدتين'),
-  PracticeStep(Posture.sujud, 'Prostrate again', 'السجدة الثانية'),
-  PracticeStep(Posture.julus, 'Sit', 'الجلوس'),
+  PracticeStep(Posture.qiyam, 'Stand', 'القيام', FigurePose.qiyam),
+  PracticeStep(Posture.ruku, 'Bow', 'الركوع', FigurePose.ruku),
+  PracticeStep(
+      Posture.qiyam, 'Stand up again', 'الرفع من الركوع', FigurePose.itidal),
+  PracticeStep(Posture.sujud, 'Prostrate', 'السجود', FigurePose.sujud),
+  PracticeStep(Posture.julus, 'Sit', 'الجلوس بين السجدتين', FigurePose.julus),
+  PracticeStep(
+      Posture.sujud, 'Prostrate again', 'السجدة الثانية', FigurePose.sujud),
+  PracticeStep(Posture.julus, 'Sit', 'الجلوس', FigurePose.julus),
 ];
 
 /// Where the child is in the practice.
