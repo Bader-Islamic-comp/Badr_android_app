@@ -128,9 +128,9 @@ class ConnectionCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(configured
               ? 'Connect or refresh the synthetic server state.'
-              : 'Orientation and Robert’s preview work here. A developer must '
-                  'configure a demo service to use questions, saved progress '
-                  'and inventory.'),
+              : 'Orientation and Robert’s preview work here. An adult can '
+                  'enter a development service in the parent area to use '
+                  'questions, saved progress and inventory.'),
           if (configured)
             Padding(
                 padding: const EdgeInsets.only(top: 16),

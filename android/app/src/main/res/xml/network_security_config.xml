@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reviewers run the development service on their own computer
+     (Badr_backend deploy/) and reach it over plain http on their Wi-Fi.
+     Android cannot express "private address ranges" here, so cleartext is
+     permitted and lib/data/demo_api.dart (DemoConfig.enabled) refuses http to
+     anything but localhost, 127/8, 10/8, 172.16/12 and 192.168/16. Before any
+     child-facing release, set this back to false and serve https. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

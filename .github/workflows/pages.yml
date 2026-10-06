@@ -1,0 +1,52 @@
+# Publishes the offline browser preview to GitHub Pages:
+#   https://bader-islamic-comp.github.io/Badr_android_app/
+# It is the UI only: no backend, speech, camera helper or Unity room (Robert is
+# a still picture). One-time setup: Settings -> Pages -> Source: GitHub Actions.
+name: Web preview (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      # Self-hosted CanvasKit, so visitors' browsers make no third-party requests.
+      - run: >
+          flutter build web --release --no-web-resources-cdn
+          --dart-define=POSTURE_HELPER=false --dart-define=VOICE=false
+          --base-href /${{ github.event.repository.name }}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

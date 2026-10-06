@@ -274,6 +274,20 @@ The default run performs no backend requests. It supports a local orientation,
 labels local completion accurately and never invents a reward balance. The parent
 area is explicitly a prototype, not a secure gate or a consent flow.
 
+## Reviewer APK and live web preview
+
+- **APK:** the token-free universal release APK (ARM64 + x86_64, Unity room) is
+  attached to the repository's GitHub Releases, not committed: it is larger
+  than GitHub's 100 MB file limit. Release notes and the install steps are in
+  [`doc/reviewer-release.md`](doc/reviewer-release.md).
+- **Web preview:** <https://bader-islamic-comp.github.io/Badr_android_app/>,
+  built and deployed by `.github/workflows/pages.yml` on every push to `main`
+  (`POSTURE_HELPER=false`, `VOICE=false`, self-hosted CanvasKit). It is the
+  offline UI only: no backend, speech, camera helper or Unity room. One-time
+  setup: Settings → Pages → Source: **GitHub Actions**.
+- **Server for a phone:** reviewers run the backend's Docker demo on their own
+  computer and enter its address and token in the parent area (below).
+
 ## Optional development service
 
 Start the repository's API in its explicit development mode with an
@@ -283,12 +297,25 @@ operator-supplied demo token, then configure matching values at build/run time:
 flutter run --dart-define=DEMO_API_URL=http://10.0.2.2:8000 --dart-define=DEMO_API_TOKEN=your-local-demo-token
 ```
 
-Use `127.0.0.1` for desktop; Android emulator uses `10.0.2.2`. The Android debug
-configuration allows HTTP only for those loopback/development hosts and
-`localhost`; it does not change release transport settings. A physical device
-needs a reachable HTTPS development host. Never commit a real token. Dart defines
-are embedded in the binary and are **not** appropriate for production secrets or
-authentication.
+Use `127.0.0.1` for desktop; Android emulator uses `10.0.2.2`. Never commit a
+real token. Dart defines are embedded in the binary and are **not** appropriate
+for production secrets or authentication.
+
+**Without rebuilding (reviewers):** while the app is not connected, the parent
+area has a **Development service** form for a server address and operator token,
+such as the ones printed by the backend's Docker demo
+(`Badr_backend/deploy/README.md`). The entered token is held in memory only and
+is gone after a relaunch; switching services also needs a relaunch. The browser
+preview does not show the form.
+
+Plain `http` is accepted only for `localhost` and the IPv4 loopback and private
+ranges (127/8, 10/8, 172.16/12, 192.168/16), which covers the emulator's
+`10.0.2.2` and a computer on the same Wi-Fi; any other host needs `https`
+(`DemoConfig.enabled`). Android cannot express address ranges in a network
+security config, so `res/xml/network_security_config.xml` permits cleartext and
+that Dart rule decides. Set it back to `false` and serve HTTPS before any
+child-facing release. The release manifest declares `INTERNET` itself rather
+than relying on a plugin or the Unity export.
 
 Connection is user initiated from the connection card on Quests, Style or the
 parent area, or from Talk: until a configured build is connected, a link button
