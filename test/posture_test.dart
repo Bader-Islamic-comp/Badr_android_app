@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -46,7 +47,9 @@ YuvFrame _frame(int width, int height, List<int> luma,
   );
 }
 
-PostureReading _reading(Posture? posture, [double confidence = 0.9]) {
+/// A reading sure enough of [posture] to pass any threshold unless
+/// [confidence] says otherwise.
+PostureReading _reading(Posture? posture, [double confidence = 0.995]) {
   final rest = (1 - confidence) / Posture.values.length;
   return PostureReading([
     for (final p in Posture.values) p == posture ? confidence : rest,
@@ -182,6 +185,55 @@ void main() {
       for (var i = 0; i < 5; i++) {
         expect(smoother.add(_reading(Posture.sujud, 0.5)), isNull);
       }
+    });
+
+    test('holds each posture to its own threshold', () {
+      final smoother = PostureSmoother(thresholds: {
+        Posture.qiyam: 0.6,
+        Posture.ruku: 0.6,
+        Posture.sujud: 0.9,
+        Posture.julus: 0.6,
+      });
+      for (var i = 0; i < 5; i++) {
+        expect(smoother.add(_reading(Posture.sujud, 0.85)), isNull);
+      }
+      smoother.reset();
+      for (var i = 0; i < 3; i++) {
+        smoother.add(_reading(Posture.julus, 0.65));
+      }
+      expect(smoother.add(_reading(Posture.julus, 0.65)), Posture.julus);
+      smoother.reset();
+      smoother.add(_reading(Posture.sujud, 0.9));
+      smoother.add(_reading(Posture.sujud, 0.9));
+      expect(smoother.add(_reading(Posture.sujud, 0.9)), Posture.sujud);
+    });
+
+    test('nobody never counts, however sure the model is', () {
+      final smoother = PostureSmoother(
+          thresholds: {for (final posture in Posture.values) posture: 0});
+      for (var i = 0; i < 5; i++) {
+        expect(smoother.add(_reading(null, 0.4)), isNull);
+      }
+    });
+
+    test('needs a threshold for every posture', () {
+      expect(() => PostureSmoother(thresholds: {Posture.qiyam: 0.6}),
+          throwsA(isA<AssertionError>()));
+    });
+
+    test('its thresholds are the ones calibrated with the bundled model', () {
+      final calibration = jsonDecode(
+          File('ml/prayer_posture/results/thresholds.json')
+              .readAsStringSync()) as Map<String, dynamic>;
+      final thresholds = calibration['thresholds'] as Map<String, dynamic>;
+      expect(
+          thresholds.keys, unorderedEquals(Posture.values.map((p) => p.name)));
+      for (final posture in Posture.values) {
+        expect(PostureSmoother.defaultThresholds[posture],
+            (thresholds[posture.name] as num).toDouble(),
+            reason: posture.name);
+      }
+      expect(PostureSmoother().thresholds, PostureSmoother.defaultThresholds);
     });
 
     test('lets go of a posture the child has left', () {

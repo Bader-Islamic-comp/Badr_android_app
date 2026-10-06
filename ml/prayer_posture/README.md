@@ -23,15 +23,17 @@ it. Only the scripts, the metrics and the exported model are committed.
    2.19 on Windows runs on the CPU. The main run takes about 15 minutes on a
    6-core desktop. Leave about 6 GB of memory free: with the emulator and a
    Gradle daemon running, fine-tuning ran out of memory.
-3. Prepare the samples. This writes 256-pixel crops, `manifest.csv` with
-   leakage-aware splits, and the test split again under `check/` for the
-   on-device check:
+3. Prepare the samples into an empty folder. This writes 256-pixel crops,
+   `manifest.csv` with leakage-aware splits, and the test split again under
+   `check/` for the on-device check. It applies the two reviewed lists beside
+   it: `kaggle_rotations.csv` and `kaggle_none_excluded.csv`.
 
    ```bash
    python prepare.py --kaggle <dir>/Salat-All-img-xml --imcspd <dir>/IMCSPD-Dataset --out <dir>/prepared
    ```
 
-4. Train, export and score:
+4. Train, export and score. Each run also sets the per-posture thresholds on
+   its validation split and scores the test split at them (`calibrate.py`):
 
    ```bash
    python train.py --data <dir>/prepared --out <dir>/runs/main
@@ -39,13 +41,15 @@ it. Only the scripts, the metrics and the exported model are committed.
    python train.py --data <dir>/prepared --out <dir>/runs/imcspd-to-kaggle --train imcspd,synthetic --test kaggle --no-export
    ```
 
-5. Copy `runs/main/prayer_posture.tflite` to `../../assets/models/`, and each
-   run's `metrics.json` to `results/<run>.json`. Then update the model card.
-   `test/posture_test.dart` checks that the labels file matches the app's
-   `Posture` order and that the model is bundled.
+5. Copy `runs/main/prayer_posture.tflite` to `../../assets/models/`,
+   `runs/main/thresholds.json` to `results/thresholds.json`, and each run's
+   `metrics.json` to `results/<run>.json`. Copy the thresholds into
+   `PostureSmoother.defaultThresholds` (`lib/posture/posture_smoother.dart`).
+   Then update the model card. `test/posture_test.dart` checks that the labels
+   file matches the app's `Posture` order, that the model is bundled, and that
+   the app's thresholds are the ones in `results/thresholds.json`.
 6. Check the model on a device. Its header says how to copy `check/` into the
-   app. On the Android 16 x86_64 emulator it read 435 of the 484 test pictures
-   correctly (89.9%), at 180 ms per inference:
+   app. On the Android 16 x86_64 emulator it read ON_DEVICE:
 
    ```bash
    flutter test integration_test/posture_model_test.dart -d emulator-5554
@@ -56,6 +60,9 @@ it. Only the scripts, the metrics and the exported model are committed.
 | File | What it does |
 | --- | --- |
 | `prepare.py` | Maps both datasets to the four postures and crops each person square. It adds "none" samples: squares clear of the person in single-person photos, and generated flat colours, gradients, blocks and noise. It groups near-duplicates by photo, session, numbered sequence and picture hash, then splits each source by group into train, val and test. |
-| `train.py` | Trains MobileNetV3-Small with ImageNet weights in two stages. It exports a TensorFlow Lite model with int8 weights and scores the Keras model and the exported file on the held-out test set. |
-| `results/` | `metrics.json` from the runs behind the bundled model. |
+| `kaggle_rotations.csv` | The 222 Kaggle photos stored on their side, and how far to turn each one upright. Found with a self-supervised rotation classifier and a look at every photo; each one confirmed by eye. |
+| `kaggle_none_excluded.csv` | The 31 Kaggle photos whose "none" square has a person nobody boxed, and who it is. Found by looking at every square. |
+| `train.py` | Trains MobileNetV3-Small with ImageNet weights in two stages. It exports a TensorFlow Lite model with int8 weights, scores the Keras model and the exported file on the held-out test set, and calls `calibrate.py`. |
+| `calibrate.py` | Sets each posture's confidence threshold on the validation split (the lowest from 0.6 up that reaches 90% precision) and scores the test split at those thresholds. It can also be run alone on a run folder. |
+| `results/` | `metrics.json` from the runs behind the bundled model, and `thresholds.json`, the thresholds the app ships with. |
 | `MODEL_CARD.md` | What the model is for, what it is not for, its data, licences, results and limits. |

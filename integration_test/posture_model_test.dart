@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:companion_mobile/posture/camera_posture_source.dart';
 import 'package:companion_mobile/posture/posture.dart';
 import 'package:companion_mobile/posture/posture_input.dart';
+import 'package:companion_mobile/posture/posture_smoother.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -57,6 +58,11 @@ void main() {
     final confusion = [
       for (final _ in names) List.filled(PostureReading.outputs, 0)
     ];
+    // The same, as the app counts frames: below its posture's threshold a
+    // reading is nothing seen, the last column.
+    final counted = [
+      for (final _ in names) List.filled(PostureReading.outputs, 0)
+    ];
     var micros = 0;
     var count = 0;
     for (final (index, name) in names.indexed) {
@@ -71,7 +77,11 @@ void main() {
         final reading = PostureReading(output.toList());
         expect(reading.probabilities.fold<double>(0, (a, b) => a + b),
             closeTo(1, 0.01));
-        confusion[index][reading.top?.index ?? Posture.values.length]++;
+        final top = reading.top;
+        confusion[index][top?.index ?? Posture.values.length]++;
+        final counts = top != null &&
+            reading.confidence >= PostureSmoother.defaultThresholds[top]!;
+        counted[index][counts ? top.index : Posture.values.length]++;
         count++;
       }
     }
@@ -83,7 +93,8 @@ void main() {
     print('posture model on device: $right/$count right '
         '(${(100 * right / count).toStringAsFixed(1)}%), '
         '${(micros / count / 1000).toStringAsFixed(1)} ms per inference, '
-        'confusion $confusion');
+        'confusion $confusion, '
+        'counted at the thresholds $counted');
     expect(right / count, greaterThan(0.85));
   });
 }

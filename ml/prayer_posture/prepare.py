@@ -7,6 +7,12 @@ in it (`CLASSES`), saved as a 256×256 JPEG:
   with a margin. Its two spellings of sitting and of sujud are merged. From
   half of the photos with a single person, a square well clear of them is
   "none".
+  Two reviewed lists beside this script correct the set. 222 lab photos are
+  stored on their side with no EXIF orientation; `kaggle_rotations.csv` says
+  how far to turn each one upright (the phone always gives upright frames).
+  `kaggle_none_excluded.csv` names the photos whose "none" square has a person
+  in it nobody boxed, such as a TV presenter; those squares are dropped. Each
+  entry was confirmed by eye on contact sheets.
 - Mendeley IMCSPD (CC BY 4.0): the standing-prayer folders only, the whole
   photo padded to a square. The seated and lying modalities are left out: they
   are other ways of praying, not the movements a child learns first.
@@ -32,8 +38,9 @@ whose split comes closest to those shares.
 
 writes `<out>/images/<source>/<id>.jpg`, `<out>/manifest.csv`, and the test
 split again as `<out>/check/<posture>/<id>.jpg` for the on-device check
-(`integration_test/posture_model_test.dart`). No image leaves the dataset
-folder; nothing here belongs in the repository.
+(`integration_test/posture_model_test.dart`). Give it an empty `<out>`: files
+from an earlier run are not removed, and a stale `check/` would be scored. No
+image leaves the dataset folder; nothing here belongs in the repository.
 """
 
 from __future__ import annotations
@@ -132,6 +139,20 @@ def dhash(image: Image.Image) -> np.ndarray:
 
 
 _ORIENT = {3: Image.Transpose.ROTATE_180, 6: Image.Transpose.ROTATE_270, 8: Image.Transpose.ROTATE_90}
+# Degrees clockwise, as `kaggle_rotations.csv` gives them.
+_CLOCKWISE = {90: Image.Transpose.ROTATE_270, 180: Image.Transpose.ROTATE_180, 270: Image.Transpose.ROTATE_90}
+
+
+def reviewed(name: str) -> dict[str, dict]:
+    """A reviewed list beside this script, by file stem."""
+    with open(Path(__file__).with_name(name), encoding="utf-8", newline="") as f:
+        return {row["stem"]: row for row in csv.DictReader(f)}
+
+
+def _turn(image: Image.Image, turns: list[Image.Transpose]) -> Image.Image:
+    for turn in turns:
+        image = image.transpose(turn)
+    return image
 
 
 def _bytes(path: Path) -> str:
@@ -219,6 +240,10 @@ def synthetic(count: int = SYNTHETIC, seed: int = 11) -> list[Sample]:
 def kaggle(root: Path, seed: int = 7) -> tuple[list[Sample], Counter]:
     samples, skipped = [], Counter()
     rng = np.random.default_rng(seed)
+    rotations, people = reviewed("kaggle_rotations.csv"), reviewed("kaggle_none_excluded.csv")
+    stems = {xml.stem for xml in root.glob("*.xml")}
+    if unknown := (set(rotations) | set(people)) - stems:
+        raise ValueError(f"reviewed lists name photos that are not in {root}: {sorted(unknown)}")
     for xml in sorted(root.glob("*.xml")):
         tree = ET.parse(xml).getroot()
         path = next((p for p in root.glob(xml.stem + ".*") if p.suffix.lower() != ".xml"), None)
@@ -236,8 +261,13 @@ def kaggle(root: Path, seed: int = 7) -> tuple[list[Sample], Counter]:
             skipped["size differs from annotation"] += 1
             continue
         orientation = raw.getexif().get(274, 1)
+        # From the stored pixels to upright: the EXIF orientation, then the
+        # reviewed turn of a photo stored on its side.
+        turns = [_ORIENT[orientation]] if orientation in _ORIENT else []
+        if xml.stem in rotations:
+            turns.append(_CLOCKWISE[int(rotations[xml.stem]["clockwise"])])
         image = raw.convert("RGB")
-        upright = image.transpose(_ORIENT[orientation]) if orientation in _ORIENT else image
+        upright = _turn(image, turns)
         folder = tree.findtext("folder") or ""
         keys = [f"photo:kaggle:{xml.stem}", _bytes(path)]
         keys += [k for k in (_session(raw, "kaggle", xml.stem) or _sequence(xml.stem, folder),) if k]
@@ -248,10 +278,13 @@ def kaggle(root: Path, seed: int = 7) -> tuple[list[Sample], Counter]:
         if len(objects) == 1 and rng.random() < BACKGROUND_SHARE:
             corners = [objects[0].findtext(f"bndbox/{k}") for k in ("xmin", "ymin", "xmax", "ymax")]
             empty = None if None in corners else background(image, [tuple(float(v) for v in corners)], rng)
-            if empty is not None:
-                if orientation in _ORIENT:
-                    empty = empty.transpose(_ORIENT[orientation])
-                samples.append(Sample(f"kaggle-{xml.stem}-none", "kaggle", NONE, path.name, empty, picture, list(keys)))
+            # A square with someone in it is cut all the same, so that every
+            # other photo keeps the square it had.
+            if empty is not None and xml.stem in people:
+                skipped["none square with a person in it"] += 1
+            elif empty is not None:
+                samples.append(Sample(f"kaggle-{xml.stem}-none", "kaggle", NONE, path.name,
+                                      _turn(empty, turns), picture, list(keys)))
         for index, obj in enumerate(objects):
             label = KAGGLE_NAMES.get((obj.findtext("name") or "").strip())
             if label is None:
@@ -265,11 +298,9 @@ def kaggle(root: Path, seed: int = 7) -> tuple[list[Sample], Counter]:
             if min(box[2] - box[0], box[3] - box[1]) < MIN_BOX:
                 skipped["box under 48 px"] += 1
                 continue
-            crop = square(image, box)
             # The boxes are drawn on the stored pixels; a crop is turned upright
             # only after it is cut.
-            if orientation in _ORIENT:
-                crop = crop.transpose(_ORIENT[orientation])
+            crop = _turn(square(image, box), turns)
             samples.append(Sample(f"kaggle-{xml.stem}-{index}", "kaggle", label, path.name, crop, picture, list(keys)))
     return samples, skipped
 

@@ -12,7 +12,11 @@ phone the child fills less of the frame than a labelled box does.
 A test source that is also a training source is scored on its test split; one
 that is not is scored on all of it, which is the cross-dataset check.
 
-Writes to <out>: `prayer_posture.tflite`, `labels.txt` and `metrics.json`. The
+At the end it sets each posture's confidence threshold on the validation split
+(`calibrate.py`) and scores the test split at those thresholds too.
+
+Writes to <out>: `prayer_posture.tflite`, `labels.txt`, `thresholds.json` and
+`metrics.json`. The
 model takes a float RGB image in 0–255 and gives five probabilities. Its weights
 are int8 and its activations float (dynamic-range quantization): a full int8
 export of this network is the same size but fails to prepare under XNNPACK,
@@ -36,9 +40,10 @@ import tensorflow as tf  # noqa: E402
 from keras import layers  # noqa: E402
 from sklearn.metrics import confusion_matrix, f1_score, precision_recall_fscore_support  # noqa: E402
 
+from calibrate import at_thresholds, calibrate, summary  # noqa: E402
 from prepare import CLASSES, NONE  # noqa: E402
 
-MODEL_VERSION = "prayer-posture-v1"
+MODEL_VERSION = "prayer-posture-v2"
 INPUT = 224
 GRAY = 114.0
 
@@ -194,6 +199,7 @@ def main() -> None:
     tune = model.fit(train_ds, validation_data=val_ds, epochs=args.tune_epochs, class_weight=weights, verbose=2,
                      callbacks=[keras.callbacks.EarlyStopping("val_loss", patience=6, restore_best_weights=True)])
 
+    keras_test = model.predict(dataset(args.data, test_part, training=False), verbose=0)
     metrics = {
         "model": MODEL_VERSION,
         "classes": list(CLASSES),
@@ -204,22 +210,35 @@ def main() -> None:
         "counts": {"train": len(train_part), "val": len(val_part), "test": len(test_part)},
         "epochs": {"head": len(head.history["loss"]), "tune": len(tune.history["loss"])},
         "val_accuracy": round(float(max(tune.history["val_accuracy"])), 4),
-        "keras": report(test_part, model.predict(dataset(args.data, test_part, training=False), verbose=0)),
+        "keras": report(test_part, keras_test),
         "seed": args.seed,
         "tensorflow": tf.__version__,
         "keras_version": keras.__version__,
         "machine": platform.processor() or platform.machine(),
     }
+    # The thresholds are set on val with the model the app would run: the
+    # exported file, or the Keras model when nothing is exported.
+    scored_with, val_probabilities = "keras", model.predict(val_ds, verbose=0)
     if not args.no_export:
         path = export(model, args.out)
-        metrics["tflite"] = report(test_part, run_tflite(path, args.data, test_part))
+        tflite_test = run_tflite(path, args.data, test_part)
+        metrics["tflite"] = report(test_part, tflite_test)
         metrics["tflite"]["bytes"] = path.stat().st_size
         (args.out / "labels.txt").write_text("\n".join(CLASSES) + "\n", encoding="utf-8")
+        scored_with, val_probabilities = "tflite", run_tflite(path, args.data, val_part)
+    thresholds = calibrate(val_part, val_probabilities)
+    calibration = summary(MODEL_VERSION, scored_with, val_part, val_probabilities, thresholds)
+    (args.out / "thresholds.json").write_text(json.dumps(calibration, indent=2) + "\n", encoding="utf-8")
+    metrics["thresholds"] = {k: v for k, v in calibration.items() if k not in ("model", "floor")}
+    metrics["keras"]["at_thresholds"] = at_thresholds(test_part, keras_test, thresholds)
+    if not args.no_export:
+        metrics["tflite"]["at_thresholds"] = at_thresholds(test_part, tflite_test, thresholds)
     (args.out / "metrics.json").write_text(json.dumps(metrics, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    summary = {k: metrics[k]["accuracy"] for k in ("keras", "tflite") if k in metrics}
-    print(json.dumps({"test": summary, "macro_f1": metrics["keras"]["macro_f1"],
+    accuracy = {k: metrics[k]["accuracy"] for k in ("keras", "tflite") if k in metrics}
+    print(json.dumps({"test": accuracy, "macro_f1": metrics["keras"]["macro_f1"],
                       "nobody": metrics.get("tflite", metrics["keras"])["nobody"],
-                      "by_source": {s: v["accuracy"] for s, v in metrics["keras"]["by_source"].items()}}))
+                      "by_source": {s: v["accuracy"] for s, v in metrics["keras"]["by_source"].items()},
+                      "thresholds": thresholds}))
 
 
 if __name__ == "__main__":
