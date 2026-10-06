@@ -73,6 +73,7 @@ Paired server changes are in `comp-server/CHANGELOG.md`; the shared files under
   - The cross-dataset checks were run with v1's data preparation and have not been re-run for v2.
   - `integration_test/posture_model_test.dart` also prints the counts at the thresholds now. v2's file has not
     been run on the emulator yet.
+  - With v2 and the drawings in, 183 tests pass and `flutter analyze` is clean (Flutter 3.47.5, on Linux).
 - **`AGENTS.md` and the roadmap name the helper as the one exception** to "no on-device inference" and "no camera
   verification". The product owner approved it on 2026-10-06. Every other camera or body-motion feature still
   needs its own approval.
