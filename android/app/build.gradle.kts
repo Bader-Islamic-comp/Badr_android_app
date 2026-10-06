@@ -22,11 +22,11 @@ android {
         // The exported unityLibrary declares minSdk 25, so the app cannot ask
         // for less or the manifest merge fails.
         minSdk = maxOf(flutter.minSdkVersion, 25)
-        // The current export is x86_64 only, which is what the development
-        // emulator runs. Match it so the APK cannot ship a Flutter ABI with no
-        // Unity runtime beside it. A phone build needs an ARM64 export.
+        // Match the Unity export's emulator and phone runtimes. Every Flutter
+        // ABI in the APK must have a Unity runtime beside it.
         ndk {
             abiFilters.clear()
+            abiFilters.add("arm64-v8a")
             abiFilters.add("x86_64")
         }
         targetSdk = flutter.targetSdkVersion

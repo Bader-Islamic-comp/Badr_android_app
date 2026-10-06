@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../posture/camera_posture_source.dart';
+import '../posture/camera_posture_source.dart'
+    if (dart.library.js_interop) '../posture/web_posture_source.dart';
 import '../posture/movement_practice.dart';
 import '../posture/posture.dart';
 import '../posture/posture_smoother.dart';

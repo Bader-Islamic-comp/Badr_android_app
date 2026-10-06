@@ -132,9 +132,8 @@ namespace Companion.Presentation.Editor
         /// <summary>
         /// Exports a Gradle `unityLibrary` module for the Flutter host to embed.
         ///
-        /// This targets x86_64 only, which is what the development emulator
-        /// runs. A physical phone needs ARM64, and a store build needs both
-        /// plus its own signing — neither is configured here.
+        /// Export both emulator x86_64 and phone ARM64 Unity runtimes so every
+        /// ABI in the Flutter APK has the same character room available.
         /// </summary>
         private static string ExportProject(string scenePath)
         {
@@ -147,7 +146,8 @@ namespace Companion.Presentation.Editor
             PlayerSettings.companyName = "Learning Companion";
             PlayerSettings.productName = "Robert Room";
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;
-            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.X86_64;
+            PlayerSettings.Android.targetArchitectures =
+                AndroidArchitecture.X86_64 | AndroidArchitecture.ARM64;
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             // Unity 6 defaults to GameActivity, whose export ships only
             // `UnityPlayerGameActivity` — an Activity to launch, with no

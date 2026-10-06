@@ -226,16 +226,16 @@ named `companion`.
 Run `dart format lib test`, `flutter analyze` and `flutter test` after changes.
 
 Android builds succeed: `flutter build apk --debug` and `--release` both
-produce an APK (release 49.3 MB without a Unity export; 125 MB debug with the
-x86_64 export, which is a debug, single-ABI number and not a shipping size), and
-the Kotlin host in `android/app/src/main/kotlin/` compiles into both. The APK
+produce an APK. The current token-free universal release APK with the Unity
+room is 114,394,595 bytes and includes ARM64 and x86_64 native libraries. The
+Kotlin host in `android/app/src/main/kotlin/` compiles into both. The APK
 requests `INTERNET`, `CAMERA` for the prayer-movement helper and, since the
 voice preview, `RECORD_AUDIO` from the `record` plugin. No storage or location
 permission: the camera plugin's `WRITE_EXTERNAL_STORAGE` is removed from the
 manifest, and the camera and microphone are optional hardware. The microphone
 is asked for only when a parent has turned on "Microphone (hold to talk)" and
-the child holds the button. Those builds predate the voice preview; it has not
-been built for Android yet, so its merged manifest is still to be checked.
+the child holds the button. The voice preview remains disabled in the current
+reviewer APK because the speech service is unavailable.
 
 The app has been run on an **Android 16 x86_64 emulator**: the character room
 renders, the bridge handshake completes, an earned colour look sent over the
@@ -248,14 +248,12 @@ device has been used**, so startup, memory, frame time, ARM64, TalkBack,
 keyboard insets and rotation are all still unmeasured, and no performance
 budget has been approved to measure against.
 
-`android/settings.gradle.kts` includes the exported Unity room as
-`:unityLibrary` **only when `unity/export/unityLibrary` exists**, so the app
-still builds without an export and Flutter keeps its static avatar. The module
+`android/settings.gradle.kts` requires the exported Unity room as
+`:unityLibrary`; export it before building the Android app. The module
 reads `unityStreamingAssets` and `unity.*` Gradle properties that live in the
 export's own `gradle.properties`; settings reads them from there rather than
-committing absolute SDK and NDK paths. An export forces `minSdk 25` and, for the
-current x86_64-only export, restricts the app's ABIs to match so the APK cannot
-ship a Flutter ABI with no Unity runtime beside it.
+committing absolute SDK and NDK paths. An export forces `minSdk 25`. The
+export and Flutter APK both include ARM64 and x86_64 so each ABI has Unity.
 
 Release builds shrink with R8. `android/app/proguard-rules.pro` keeps
 `CompanionEventBridge`, which the Unity receiver reaches by name over JNI;
