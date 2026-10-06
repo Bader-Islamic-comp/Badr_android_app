@@ -1,0 +1,87 @@
+{
+  "model": "prayer-posture-v2",
+  "calibrated_on": "val",
+  "scored_with": "tflite",
+  "target_precision": 0.9,
+  "floor": 0.6,
+  "thresholds": {
+    "qiyam": 0.6,
+    "ruku": 0.6,
+    "sujud": 0.6,
+    "julus": 0.6
+  },
+  "val": {
+    "per_posture": {
+      "qiyam": {
+        "threshold": 0.6,
+        "precision": 1.0,
+        "recall": 0.9556,
+        "n": 45,
+        "called": 43
+      },
+      "ruku": {
+        "threshold": 0.6,
+        "precision": 0.9917,
+        "recall": 0.9675,
+        "n": 123,
+        "called": 120
+      },
+      "sujud": {
+        "threshold": 0.6,
+        "precision": 0.9756,
+        "recall": 0.9639,
+        "n": 83,
+        "called": 82
+      },
+      "julus": {
+        "threshold": 0.6,
+        "precision": 0.9615,
+        "recall": 1.0,
+        "n": 100,
+        "called": 104
+      }
+    },
+    "false_sightings": 0.0172,
+    "people_unseen": 0.0085,
+    "people_wrong_posture": 0.0171,
+    "n_nobody": 58,
+    "n_people": 351
+  },
+  "val_at_floor": {
+    "per_posture": {
+      "qiyam": {
+        "threshold": 0.6,
+        "precision": 1.0,
+        "recall": 0.9556,
+        "n": 45,
+        "called": 43
+      },
+      "ruku": {
+        "threshold": 0.6,
+        "precision": 0.9917,
+        "recall": 0.9675,
+        "n": 123,
+        "called": 120
+      },
+      "sujud": {
+        "threshold": 0.6,
+        "precision": 0.9756,
+        "recall": 0.9639,
+        "n": 83,
+        "called": 82
+      },
+      "julus": {
+        "threshold": 0.6,
+        "precision": 0.9615,
+        "recall": 1.0,
+        "n": 100,
+        "called": 104
+      }
+    },
+    "false_sightings": 0.0172,
+    "people_unseen": 0.0085,
+    "people_wrong_posture": 0.0171,
+    "n_nobody": 58,
+    "n_people": 351
+  }
+}

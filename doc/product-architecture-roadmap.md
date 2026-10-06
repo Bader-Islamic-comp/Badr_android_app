@@ -10,7 +10,7 @@ The companion is designed to support families and educators. It must not represe
 
 ### Confirmed delivery direction (2026-09-21)
 
-The first product target is an Android phone app, not a website. Flutter sends user chat requests to the backend; all AI inference and agent orchestration execute on the backend. Unity renders the character and receives sanitized presentation cues only. No on-device AI inference or model-provider credentials belong in the phone app.
+The first product target is an Android phone app, not a website. Flutter sends user chat requests to the backend; all AI inference and agent orchestration execute on the backend. Unity renders the character and receives sanitized presentation cues only. No on-device AI inference or model-provider credentials belong in the phone app, with one exception approved on 2026-10-06: the prayer-movement helper's posture classifier runs on the phone so camera frames never leave it (`doc/prayer-movement-helper.md`).
 
 The character-first main page should follow the supplied mobile `assets/ui.make` layout while retaining the existing ivory, teal and orange colors. Robert should use the supplied 3D model, gentle idle animation, blinking and brief reactions while visible, with background pause, reduced-motion support and static fallback. The native composition must be validated against the full-screen Unity boundary in section 4.2; a browser preview is not evidence of Android integration.
 
@@ -364,7 +364,7 @@ Guardian controls should cover:
 
 Give parents learning summaries rather than covert raw-chat surveillance. If transcript history is ever offered, it should be opt-in, short-retention, visible to the child, and deletable.
 
-Avoid advertising, third-party behavioral analytics, trackers, contacts, precise location, and camera-based proof. Apple expects parental gates and age-appropriate experiences in its Kids category, and Google applies additional Families policies to child-targeted applications.
+Avoid advertising, third-party behavioral analytics, trackers, contacts, precise location, and camera-based proof. The prayer-movement helper uses the camera for practice feedback on the phone only; it proves nothing and is off until a parent turns it on (`doc/prayer-movement-helper.md`). Apple expects parental gates and age-appropriate experiences in its Kids category, and Google applies additional Families policies to child-targeted applications.
 
 References:
 
@@ -472,7 +472,7 @@ Ordinary telemetry must not contain raw child prompts, transcripts, audio, perso
 
 ### Exclude
 
-- Camera or body-motion verification.
+- Camera or body-motion verification. The on-device prayer-movement helper (2026-10-06) is practice feedback, not verification.
 - Open-ended religious rulings.
 - Open-web retrieval.
 - Child-to-child messaging.

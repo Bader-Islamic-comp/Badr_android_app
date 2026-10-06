@@ -54,6 +54,10 @@ class _CompanionHomeState extends State<CompanionHome>
   bool? motionOverride;
   bool platformReducedMotion = false;
 
+  /// Whether a parent has turned on the movement helper. Off at every start:
+  /// the camera is never on by default.
+  bool movementHelper = false;
+
   bool get motionEnabled => motionOverride ?? !platformReducedMotion;
   bool get onCharacterPage => destination == CompanionDestination.talk;
 
@@ -310,6 +314,9 @@ class _CompanionHomeState extends State<CompanionHome>
                     room: room,
                     motionEnabled: motionEnabled,
                     onMotionChanged: _setMotion,
+                    movementHelper: movementHelper,
+                    onMovementHelperChanged: (value) =>
+                        setState(() => movementHelper = value),
                   ),
               icon: const Icon(Icons.shield_outlined)),
         ]),
@@ -329,6 +336,7 @@ class _CompanionHomeState extends State<CompanionHome>
             step: lessonStep,
             onStep: (value) => setState(() => lessonStep = value),
             onFinish: _finishOrientation,
+            movementHelper: movementHelper,
           ),
         CompanionDestination.quests => QuestsPage(model: model),
         CompanionDestination.style => StylePage(

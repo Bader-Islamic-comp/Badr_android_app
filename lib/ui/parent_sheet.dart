@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../bridge/avatar_room.dart';
 import '../domain/companion_controller.dart';
+import '../posture/posture_source.dart';
 import 'character_stage.dart';
 import 'widgets.dart';
 
@@ -11,6 +12,8 @@ Future<void> showParentSheet(
   required AvatarRoom room,
   required bool motionEnabled,
   required ValueChanged<bool> onMotionChanged,
+  bool movementHelper = false,
+  ValueChanged<bool>? onMovementHelperChanged,
 }) =>
     showModalBottomSheet<void>(
       context: context,
@@ -21,6 +24,8 @@ Future<void> showParentSheet(
         room: room,
         motionEnabled: motionEnabled,
         onMotionChanged: onMotionChanged,
+        movementHelper: movementHelper,
+        onMovementHelperChanged: onMovementHelperChanged ?? (_) {},
       ),
     );
 
@@ -30,12 +35,16 @@ class _ParentSheet extends StatefulWidget {
     required this.room,
     required this.motionEnabled,
     required this.onMotionChanged,
+    required this.movementHelper,
+    required this.onMovementHelperChanged,
   });
 
   final CompanionController model;
   final AvatarRoom room;
   final bool motionEnabled;
   final ValueChanged<bool> onMotionChanged;
+  final bool movementHelper;
+  final ValueChanged<bool> onMovementHelperChanged;
 
   @override
   State<_ParentSheet> createState() => _ParentSheetState();
@@ -43,6 +52,7 @@ class _ParentSheet extends StatefulWidget {
 
 class _ParentSheetState extends State<_ParentSheet> {
   late bool motionEnabled = widget.motionEnabled;
+  late bool movementHelper = widget.movementHelper;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -111,6 +121,25 @@ class _ParentSheetState extends State<_ParentSheet> {
                     title: Text('Voice is off'),
                     subtitle:
                         Text('No microphone access or audio collection.')),
+                if (postureHelperBuilt)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: movementHelper,
+                    onChanged: (value) {
+                      setState(() => movementHelper = value);
+                      widget.onMovementHelperChanged(value);
+                    },
+                    secondary: Icon(movementHelper
+                        ? Icons.videocam_outlined
+                        : Icons.videocam_off_outlined),
+                    title: const Text('Movement helper (camera)'),
+                    subtitle: const Text(
+                        'Lets the prayer-movement practice use the front '
+                        'camera to recognise standing, bowing, prostrating and '
+                        'sitting. The model runs on this phone: no picture is '
+                        'recorded, saved or sent, and the camera turns on only '
+                        'when asked on that page. Off by default.'),
+                  ),
                 // Whether a model answers questions is the service's switch, so
                 // this reports it rather than offering to change it.
                 ListenableBuilder(
@@ -162,7 +191,14 @@ class _ParentSheetState extends State<_ParentSheet> {
                     onConnect: widget.model.connect,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                // Attribution the posture model's datasets ask for, among the
+                // packages' own licences.
+                TextButton(
+                    onPressed: () => showLicensePage(
+                        context: context, applicationName: 'little steps'),
+                    child: const Text('Licences')),
+                const SizedBox(height: 8),
                 SizedBox(
                     width: double.infinity,
                     child: FilledButton(

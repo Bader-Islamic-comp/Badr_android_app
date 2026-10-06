@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/companion_controller.dart';
 import '../theme.dart';
+import 'prayer_practice_page.dart';
 import 'widgets.dart';
 
 class LearnPage extends StatelessWidget {
@@ -11,12 +12,17 @@ class LearnPage extends StatelessWidget {
     required this.step,
     required this.onStep,
     required this.onFinish,
+    this.movementHelper = false,
   });
 
   final CompanionController model;
   final int? step;
   final ValueChanged<int?> onStep;
   final Future<void> Function() onFinish;
+
+  /// Whether a parent has turned on the movement helper, which lets the
+  /// prayer-movement practice use the camera.
+  final bool movementHelper;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +40,28 @@ class LearnPage extends StatelessWidget {
           child: step == null
               ? _intro(context, lesson.title, lesson.summary)
               : _stepper(context, lesson.steps, step!),
+        ),
+        const SizedBox(height: 16),
+        Panel(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.accessibility_new_rounded, size: 32, color: teal),
+            const SizedBox(height: 12),
+            Text('Prayer movements',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            const Text('Practise standing, bowing, prostrating and sitting, '
+                'one movement at a time.'),
+            const SizedBox(height: 16),
+            _action(
+              label: 'Practise the movements',
+              hint: 'Opens the prayer movement practice',
+              onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                      builder: (_) =>
+                          PrayerPracticePage(helperAllowed: movementHelper))),
+            ),
+          ]),
         ),
         const SizedBox(height: 16),
         const Panel(
