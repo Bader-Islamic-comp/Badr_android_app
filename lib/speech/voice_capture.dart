@@ -28,7 +28,13 @@ enum CaptureState {
 /// ([DemoApi.maxAudioBytes] with the WAV header). Reaching either ends the
 /// recording as if the button were let go. Letting go hands the WAV to
 /// [onRecorded]; when that returns, the bytes are cleared and nothing keeps
-/// them. A cancel, leaving the page or leaving the app drops them unsent.
+/// them. A cancel, leaving the page or leaving the app drops them unsent,
+/// even while the microphone is still stopping.
+///
+/// Android asks for the microphone in a window of its own, which takes the
+/// touch and leaves the app `inactive` behind it. While that question is
+/// open the press waits for the answer rather than ending: a refusal says so,
+/// and a yes says to hold the button again ([nowHold]).
 class VoiceCapture extends ChangeNotifier with WidgetsBindingObserver {
   VoiceCapture({
     required VoiceRecorder Function() recorder,
@@ -44,6 +50,8 @@ class VoiceCapture extends ChangeNotifier with WidgetsBindingObserver {
   static const couldNotStart =
       'The microphone did not start. Please try again.';
   static const holdLonger = 'Hold the button down while you speak.';
+  static const nowHold = 'The microphone is ready. Now hold to talk. · '
+      'الميكروفون جاهز، اضغط مطوّلًا وتكلّم';
 
   final VoiceRecorder Function() _makeRecorder;
   final int maxSeconds;
@@ -69,6 +77,15 @@ class VoiceCapture extends ChangeNotifier with WidgetsBindingObserver {
   bool _disposed = false;
   int _session = 0;
 
+  /// The permission question is open, and whether Android's prompt took the
+  /// screen (and the touch) while it was.
+  bool _asking = false;
+  bool _askInterrupted = false;
+
+  /// A finished recording is waiting for the microphone to stop before it is
+  /// handed over. No new press starts meanwhile: it would race that stop.
+  bool _handingOver = false;
+
   bool get listening => state == CaptureState.listening;
 
   /// The most PCM one recording may hold.
@@ -84,7 +101,12 @@ class VoiceCapture extends ChangeNotifier with WidgetsBindingObserver {
 
   /// The button went down.
   Future<void> press() async {
-    if (_disposed || state != CaptureState.idle || !_foreground) return;
+    if (_disposed ||
+        _handingOver ||
+        state != CaptureState.idle ||
+        !_foreground) {
+      return;
+    }
     _held = true;
     problem = null;
     state = CaptureState.starting;
@@ -92,15 +114,27 @@ class VoiceCapture extends ChangeNotifier with WidgetsBindingObserver {
     final session = ++_session;
     final recorder = _recorder ??= _makeRecorder();
     bool allowed;
+    _asking = true;
+    _askInterrupted = false;
     try {
       allowed = await recorder.ensurePermission();
     } catch (_) {
       allowed = false;
+    } finally {
+      _asking = false;
     }
     if (session != _session || _disposed) return;
     if (!allowed) {
       state = CaptureState.idle;
       problem = permissionRefused;
+      _changed();
+      return;
+    }
+    // Android's prompt took the touch: the finger that pressed is gone, so
+    // the next hold records.
+    if (_askInterrupted) {
+      state = CaptureState.idle;
+      problem = nowHold;
       _changed();
       return;
     }
@@ -145,11 +179,31 @@ class VoiceCapture extends ChangeNotifier with WidgetsBindingObserver {
     if (state == CaptureState.listening) await _finish();
   }
 
-  /// Drops whatever is recording, unsent.
+  /// Drops whatever is recording, unsent, and a finished recording that is
+  /// still waiting for the microphone to stop.
   void cancel() {
     _held = false;
-    if (state == CaptureState.idle) return;
+    if (state == CaptureState.idle) {
+      _session++;
+      return;
+    }
     _drop(null);
+  }
+
+  /// The system took the touch away. While Android's permission prompt is
+  /// open this is the prompt itself, and the answer is still awaited;
+  /// otherwise it is a [cancel].
+  void touchCancelled() {
+    if (_asking) {
+      _interruptAsk();
+    } else {
+      cancel();
+    }
+  }
+
+  void _interruptAsk() {
+    _held = false;
+    _askInterrupted = true;
   }
 
   void _tick(Timer timer) {
@@ -172,8 +226,19 @@ class VoiceCapture extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _finish() async {
     if (state != CaptureState.listening) return;
     final pcm = _pcm?.takeBytes() ?? Uint8List(0);
-    _session++;
-    await _stopRecording();
+    final session = ++_session;
+    _handingOver = true;
+    try {
+      await _stopRecording();
+    } finally {
+      _handingOver = false;
+    }
+    // The page closed, or the app left the screen, while the microphone
+    // stopped: nothing is sent and nobody is told.
+    if (_disposed || session != _session) {
+      pcm.fillRange(0, pcm.length, 0);
+      return;
+    }
     if (pcm.length < _shortestBytes) {
       pcm.fillRange(0, pcm.length, 0);
       problem = holdLonger;
@@ -220,8 +285,15 @@ class VoiceCapture extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) return;
+    // Android's permission prompt leaves the app inactive behind it: the
+    // press waits for the answer. Leaving the app still ends it.
+    if (state == AppLifecycleState.inactive && _asking) {
+      _interruptAsk();
+      return;
+    }
     // No recording behind another app or a locked screen.
-    if (!_foreground) cancel();
+    cancel();
   }
 
   @override

@@ -20,11 +20,20 @@ class FakeRecorder implements VoiceRecorder {
   bool disposed = false;
   StreamController<Uint8List>? _stream;
 
+  /// Runs while the permission is being asked for, as Android's prompt
+  /// would: a test makes the app inactive or takes the touch away here.
+  Future<void> Function()? whileAsking;
+
+  /// When set, a stop does not finish until this completes, like a platform
+  /// stop that takes a moment.
+  Completer<void>? stopGate;
+
   bool get recording => _stream != null;
 
   @override
   Future<bool> ensurePermission() async {
     permissionAsks++;
+    await whileAsking?.call();
     return allow;
   }
 
@@ -48,6 +57,7 @@ class FakeRecorder implements VoiceRecorder {
     final stream = _stream;
     _stream = null;
     unawaited(stream?.close());
+    await stopGate?.future;
   }
 
   @override

@@ -82,6 +82,11 @@ class _CompanionHomeState extends State<CompanionHome>
   VoiceCapture? questionMic;
   bool transcribing = false;
 
+  /// Which spoken question the composer is waiting for. Leaving Talk, the
+  /// microphone switch going off or the service turning the feature off
+  /// moves it on, and what comes back for an earlier one is dropped.
+  int transcript = 0;
+
   /// What the composer says about the last spoken question.
   String? voiceNote;
 
@@ -139,7 +144,10 @@ class _CompanionHomeState extends State<CompanionHome>
         (voiced != model.reply?.turnId || !access.robertVoice)) {
       unawaited(robertVoice.stop());
     }
-    if (!access.voiceQuestions) questionMic?.cancel();
+    if (!access.voiceQuestions) {
+      questionMic?.cancel();
+      _dropTranscript();
+    }
     if (speaking == null || identical(model.reply, speaking)) return;
     speaking = null;
     cues.quiet();
@@ -209,6 +217,7 @@ class _CompanionHomeState extends State<CompanionHome>
     if (!talk) {
       unawaited(robertVoice.stop());
       questionMic?.cancel();
+      _dropTranscript();
       cues.quiet();
     }
     await room.setOnCharacterPage(talk);
@@ -239,8 +248,16 @@ class _CompanionHomeState extends State<CompanionHome>
     setState(() => microphone = value);
     if (!value) {
       questionMic?.cancel();
+      _dropTranscript();
       voiceNote = null;
     }
+  }
+
+  /// Whatever is still being written down is not put in the composer: the
+  /// child has moved on. The model's or the page's own rebuild shows it.
+  void _dropTranscript() {
+    transcript++;
+    transcribing = false;
   }
 
   void _push(Widget page) =>
@@ -268,6 +285,9 @@ class _CompanionHomeState extends State<CompanionHome>
   /// the composer for the child to check and send. Nothing is sent to Robert
   /// until they do.
   Future<void> _transcribe(Uint8List wav) async {
+    if (!mounted) return;
+    final session = ++transcript;
+    bool current() => mounted && session == transcript;
     setState(() {
       transcribing = true;
       voiceNote = null;
@@ -275,7 +295,7 @@ class _CompanionHomeState extends State<CompanionHome>
     try {
       final heard =
           await model.api.transcribe(wav, language: speakArabic ? 'ar' : 'en');
-      if (!mounted) return;
+      if (!current()) return;
       final text = heard.text;
       if (text == null) {
         voiceNote = unsureCopy;
@@ -289,9 +309,9 @@ class _CompanionHomeState extends State<CompanionHome>
         voiceNote = heardCopy;
       }
     } on DemoApiException catch (error) {
-      voiceNote = error.message;
+      if (current()) voiceNote = error.message;
     } finally {
-      if (mounted) setState(() => transcribing = false);
+      if (current()) setState(() => transcribing = false);
     }
   }
 

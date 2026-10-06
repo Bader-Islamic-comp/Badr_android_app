@@ -41,6 +41,7 @@ const _preview = SpeechFeatures(
 
 const _listen = 'Listen · استمع';
 const _micSwitch = 'Microphone (hold to talk)';
+const _writing = 'Writing down what you said…';
 
 /// A connected controller over [handler], with the preview's switches and a
 /// reply Robert can read aloud.
@@ -441,6 +442,121 @@ void main() {
       model.dispose();
     });
 
+    for (final allow in [false, true]) {
+      testWidgets(
+          'Android’s permission prompt (the app inactive, the touch taken) '
+          '${allow ? 'ends in "now hold to talk"' : 'still says it was refused'}',
+          (tester) async {
+        _phone(tester);
+        final answered = Completer<void>();
+        final recorder = FakeRecorder(allow: allow)
+          ..whileAsking = () async {
+            // The prompt is an activity of its own over the app.
+            tester.binding
+                .handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+            await answered.future;
+          };
+        var requests = 0;
+        final model = _connected((_) async {
+          requests++;
+          return jsonResponse({'status': 'transcribed', 'text': 'مرحبا'});
+        });
+        await tester.pumpWidget(
+            CompanionApp(controller: model, voice: _kit(recorder: recorder)));
+        await tester.pumpAndSettle();
+        await _microphoneOn(tester);
+
+        final gesture = await _press(tester, _mic);
+        await gesture.cancel();
+        await _flush(tester);
+        answered.complete();
+        await _flush(tester);
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await _flush(tester);
+
+        expect(recorder.permissionAsks, 1);
+        expect(recorder.starts, 0, reason: 'the finger left with the prompt');
+        expect(find.text(VoiceCapture.permissionRefused),
+            allow ? findsNothing : findsOneWidget);
+        expect(find.text(VoiceCapture.nowHold),
+            allow ? findsOneWidget : findsNothing);
+        expect(requests, 0);
+        if (allow) {
+          recorder.whileAsking = null;
+          await _say(tester, recorder, _mic);
+          expect(requests, 1, reason: 'the next hold records');
+          expect(find.text('مرحبا'), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        model.dispose();
+      });
+    }
+
+    testWidgets(
+        'what is heard after leaving Talk is dropped, not put in the '
+        'composer', (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      final heard = Completer<http.Response>();
+      final model = _connected((request) async =>
+          request.url.path == '/v1/speech/transcriptions'
+              ? heard.future
+              : http.Response('{}', 404));
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(recorder: recorder)));
+      await tester.pumpAndSettle();
+      await _microphoneOn(tester);
+      await _say(tester, recorder, _mic);
+      expect(find.text(_writing), findsOneWidget);
+
+      await tester.tap(_tab('Learn'));
+      await tester.pumpAndSettle();
+      heard.complete(
+          jsonResponse({'status': 'transcribed', 'text': 'سؤال قديم'}));
+      await _flush(tester);
+      await tester.tap(_tab('Talk'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('سؤال قديم'), findsNothing);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          isEmpty);
+      expect(find.text(_writing), findsNothing);
+      expect(tester.widget<HoldToTalkButton>(_mic).enabled, isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets('leaving the app while the permission is asked ends the press',
+        (tester) async {
+      final recorder = FakeRecorder()
+        ..whileAsking = () async {
+          for (final state in [
+            AppLifecycleState.inactive,
+            AppLifecycleState.hidden,
+            AppLifecycleState.paused,
+          ]) {
+            tester.binding.handleAppLifecycleStateChanged(state);
+          }
+        };
+      var sent = 0;
+      final capture = VoiceCapture(
+          recorder: () => recorder,
+          maxSeconds: 15,
+          onRecorded: (_) async => sent++);
+      unawaited(capture.press());
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(capture.state, CaptureState.idle);
+      expect(recorder.starts, 0);
+      expect(capture.problem, isNull);
+      expect(sent, 0);
+      capture.dispose();
+    });
+
     testWidgets('a recording is bounded to 1 MB with its header',
         (tester) async {
       final recorder = FakeRecorder();
@@ -794,6 +910,109 @@ void main() {
       expect(find.text(PracticeWords.clearLabel), findsNothing,
           reason: 'the service hid the words this time');
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    /// Opens takbeer's practice with the microphone on, over [handler]'s
+    /// attempts.
+    Future<CompanionController> openPractice(WidgetTester tester,
+        FakeRecorder recorder, Future<http.Response> Function() attempt) async {
+      final model = _connected((request) async => switch (request.url.path) {
+            '/v1/adhkar' =>
+              jsonResponse({'items': adhkarItems, 'reviewStatus': 'draft'}),
+            '/v1/recitations/attempts' => attempt(),
+            _ => http.Response('{}', 404),
+          });
+      await tester.pumpWidget(
+          CompanionApp(controller: model, voice: _kit(recorder: recorder)));
+      await tester.pumpAndSettle();
+      await _microphoneOn(tester, tab: 'Learn');
+      await tester.tap(find.text('Open adhkar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Practise').first);
+      await tester.pumpAndSettle();
+      return model;
+    }
+
+    testWidgets('closing the page mid-recording drops it unsent',
+        (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      var sent = 0;
+      final model = await openPractice(tester, recorder, () async {
+        sent++;
+        return jsonResponse(practiceResult());
+      });
+      final gesture = await _press(tester, _mic);
+      recorder.speakSeconds(1);
+      await tester.pump(const Duration(seconds: 1));
+      expect(recorder.recording, isTrue);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(PracticePanel), findsNothing);
+      expect(recorder.recording, isFalse);
+      await gesture.up();
+      await _flush(tester);
+      expect(sent, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets(
+        'closing the page while the microphone is still stopping sends '
+        'nothing', (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      var sent = 0;
+      final model = await openPractice(tester, recorder, () async {
+        sent++;
+        return jsonResponse(practiceResult());
+      });
+      recorder.stopGate = Completer<void>();
+      await _say(tester, recorder, _mic);
+      expect(recorder.stops, 1, reason: 'let go: the stop is under way');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(PracticePanel), findsNothing);
+
+      recorder.stopGate!.complete();
+      await _flush(tester);
+      expect(sent, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets('closing the page mid-upload drops the late answer',
+        (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      final answer = Completer<http.Response>();
+      final model = await openPractice(tester, recorder, () => answer.future);
+      await _say(tester, recorder, _mic);
+      expect(find.text(PracticePanel.sendingCopy), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      answer.complete(jsonResponse(practiceResult(text: 'متأخر')));
+      await _flush(tester);
+      expect(find.text('متأخر'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      model.dispose();
+    });
+
+    testWidgets('an item the service cannot practise says so gently',
+        (tester) async {
+      _phone(tester);
+      final recorder = FakeRecorder();
+      final model = await openPractice(
+          tester, recorder, () async => errorResponse(404, 'item_not_found'));
+      await _say(tester, recorder, _mic);
+      expect(find.text(DemoApi.knownErrors['item_not_found']!), findsOneWidget);
+      expect(tester.widget<HoldToTalkButton>(_mic).enabled, isTrue,
+          reason: 'trying again stays possible');
       await tester.pumpWidget(const SizedBox());
       model.dispose();
     });

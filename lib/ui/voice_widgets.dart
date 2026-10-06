@@ -52,7 +52,7 @@ class HoldToTalkButton extends StatelessWidget {
                     }
                   : null,
               onPointerUp: (_) => capture.release(),
-              onPointerCancel: (_) => capture.cancel(),
+              onPointerCancel: (_) => capture.touchCancelled(),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 width: size,
@@ -352,6 +352,7 @@ class _PracticePanelState extends State<PracticePanel> {
   }
 
   Future<void> _send(Uint8List wav) async {
+    if (!mounted) return;
     setState(() {
       sending = true;
       problem = null;
