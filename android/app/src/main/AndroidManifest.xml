@@ -1,14 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <!-- The prayer-movement helper's front camera
-         (doc/prayer-movement-helper.md). The camera plugin also declares the
-         microphone and storage; the helper records nothing, so neither reaches
-         the app. A phone without a camera can still install it and practise
-         without the helper. -->
+         (doc/prayer-movement-helper.md). The camera records no sound. A phone
+         without a camera can still install the app and practise without the
+         helper.
+
+         RECORD_AUDIO comes from the record plugin, for the speech preview's
+         hold-to-talk (doc/voice-preview.md). It is asked for only when a
+         parent has turned on "Microphone (hold to talk)" and the child holds
+         the button; a build with VOICE=false never asks. The camera plugin
+         also declares storage, which nothing here uses, so it is removed. -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission
-        android:name="android.permission.RECORD_AUDIO"
-        tools:node="remove" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         tools:node="remove" />
@@ -16,6 +18,10 @@
         android:name="android.hardware.camera.any"
         android:required="false"
         tools:replace="android:required" />
+    <!-- The microphone is optional too: everything works by typing. -->
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
     <application
         android:label="companion_mobile"
         android:name="${applicationName}"

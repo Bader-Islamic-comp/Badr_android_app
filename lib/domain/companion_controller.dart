@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/demo_api.dart';
 import 'models.dart';
+import 'speech_models.dart';
 
 /// Unwinds a question whose conversation was cleared, or whose controller was
 /// disposed, while Robert was still thinking. Never shown to anyone.
@@ -74,6 +75,10 @@ class CompanionController extends ChangeNotifier {
   /// its library replies come from unreviewed draft content. False whenever
   /// nothing is connected.
   bool unreviewedDrafts = false;
+
+  /// The connected service's speech preview switches. All off whenever
+  /// nothing is connected. The app never turns any of them on.
+  SpeechFeatures speech = SpeechFeatures.off;
   bool orientationComplete = false;
   bool serverChallengeComplete = false;
   int? balance;
@@ -162,12 +167,14 @@ class CompanionController extends ChangeNotifier {
         connected = false;
         groundedAnswers = false;
         unreviewedDrafts = false;
+        speech = SpeechFeatures.off;
         balance = null;
         serverChallengeComplete = false;
         final service = await api.bootstrap();
         await _refresh();
         groundedAnswers = service.groundedAnswers;
         unreviewedDrafts = service.unreviewedDrafts;
+        speech = service.speech;
         connected = true;
         notice = service.unreviewedDrafts
             ? 'Connected to a corpus preview: answers come from unreviewed '
@@ -192,6 +199,13 @@ class CompanionController extends ChangeNotifier {
     serverChallengeComplete =
         challenges.any((challenge) => challenge.completed);
   }
+
+  /// Re-reads the service's progress, as after the dhikr game gave a star.
+  /// The balance is always the service's, never adjusted here.
+  Future<void> refreshProgress() => _operate(() async {
+        if (!connected) return;
+        await _refresh();
+      });
 
   Future<bool> completeOrientation() async {
     var celebrated = false;

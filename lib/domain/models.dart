@@ -207,6 +207,15 @@ enum ReplyType {
   /// Only these two come from the library, so only they carry sources. Chat
   /// is deliberately not one of them.
   bool get cited => this == grounded || this == reviewedAnswer;
+
+  /// Replies the speech preview can read aloud in Robert's voice. A
+  /// safeguarding reply and the fixed "unavailable" notice never are.
+  bool get speakable =>
+      this == chat ||
+      this == grounded ||
+      this == reviewedAnswer ||
+      this == abstained ||
+      this == redirected;
 }
 
 /// Where part of a reply came from. Display data only: there is nothing to
@@ -234,7 +243,10 @@ class ReplySource {
 /// Errors are generic and never echo what the service sent.
 class Reply {
   const Reply(
-      {required this.type, required this.text, this.sources = const []});
+      {required this.type,
+      required this.text,
+      this.sources = const [],
+      this.turnId});
 
   static final _chunkId = RegExp(r'^[a-z0-9][a-z0-9-]{1,63}#[1-9][0-9]{0,3}$');
 
@@ -292,7 +304,11 @@ class Reply {
         reference: _bounded(source['reference'], _maxSourceReference),
       ));
     }
-    return Reply(type: type, text: text, sources: List.unmodifiable(parsed));
+    return Reply(
+        type: type,
+        text: text,
+        sources: List.unmodifiable(parsed),
+        turnId: turnId);
   }
 
   static const _unexpected = 'The service returned an unexpected reply.';
@@ -323,4 +339,8 @@ class Reply {
 
   /// In citation order; empty unless `type.cited`.
   final List<ReplySource> sources;
+
+  /// The turn this reply completed, which Robert's voice is asked for by.
+  /// Null for a reply that did not come from the service.
+  final String? turnId;
 }
